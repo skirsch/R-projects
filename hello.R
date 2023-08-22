@@ -16,8 +16,8 @@
 hello <- function() {
   print("Hello, world!")
 }
-install.packages("DataEditR")
-library(DataEditR)
+# install.packages("DataEditR")
+# library(DataEditR)
 
 select_loc <- function(data, ...) {
   eval_select(rlang::expr(c(...)), data)
