@@ -28,7 +28,13 @@ tbl = tbl[,c(week,cases,deaths)]
 tbl=tbl[ order(tbl[,1]),]
 
 # if the database is reasonably valid then we should be able to change the
-# demarcation point to any point and get OR of 1
+# demarcation point to any point and get OR of <1 because people are becoming
+# more immune over time and as treatments got better
+
+# we can look at a period of time, e.g., two month before vs. after window
+# and then plot out the OR as we move the demarcation point in time,
+# basically looking for a "discontinuity" where an intervention made things
+# better or worse.
 
 columns=c(cases,deaths)
 
