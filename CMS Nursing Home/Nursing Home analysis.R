@@ -17,28 +17,38 @@ require(stats)
 directory="CMS Nursing Home/datasets/"
 prefix="faclevel_202"
 suffix=".csv"
+cases="Residents.Weekly.Confirmed.COVID.19"
+deaths="Residents.Weekly.COVID.19.Deaths"
+week="Week.Ending"
 tbl <- read.csv(paste0(directory, prefix, "0", suffix))
-tbl0 = tbl[,c("Week.Ending","Residents.Weekly.Confirmed.COVID.19","Residents.Weekly.COVID.19.Deaths")]
+tbl = tbl[,c(week,cases,deaths)]
 
 # now sort by col1 (this works only within a year since year is last)
 
-tbl0=tbl0[ order(tbl0[,1]),]
+tbl=tbl[ order(tbl[,1]),]
 
 # if the database is reasonably valid then we should be able to change the
 # demarcation point to any point and get OR of 1
 
-demarcation_row = 200000   # where to make the split. second part is after this row
-first_part= 1:demarcation_row
-second_part= demarcation_row+1:nrow(tbl)
-sums_before = colSums(tbl[first_part,], na.rm=TRUE)  # sum up to demark row
-sums_after = colSums(tbl[second_part,], na.rm = TRUE)# sum below demark row
+columns=c(cases,deaths)
 
-dead1=sums_before[[2]]
-alive1=sums_before[[1]]-dead1
+calc <- function (row_break){
+  row_break=row_break*1000
+  first_part= 1:row_break
+  second_part= row_break+1:nrow(tbl)
+  sums_before = colSums(tbl[first_part,columns], na.rm=TRUE)  # sum up to demark row
+  sums_after = colSums(tbl[second_part,columns], na.rm = TRUE)# sum below demark row
 
-dead2=sums_after[[2]]
-alive2=sums_after[[1]]-dead2
 
-odds_ratio = (dead2/alive2)/(dead1/alive1)
-sprintf("Odds ratio=%.3f", odds_ratio)
+  dead1=sums_before[[deaths]]
+  alive1=sums_before[[cases]]-dead1
+
+  dead2=sums_after[[deaths]]
+  alive2=sums_after[[cases]]-dead2
+
+  odds_ratio = (dead2/alive2)/(dead1/alive1)
+  # return a string
+  sprintf("Odds ratio=%.3f at break of %g", odds_ratio, row_break/1000)
+}
+for (i in seq(50,400,50)) print(calc(i))
 
