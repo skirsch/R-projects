@@ -8,6 +8,8 @@
 # the row numbering will be off by 1, so row 2 in excel = 1 in R
 
 library(readxl)
+library(dplyr) # need for pipe operation
+
 source_tbl=read_excel("Nursing Home Small.xlsx")
 
 # get two columns: num fatal and num deaths
