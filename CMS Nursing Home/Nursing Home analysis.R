@@ -7,16 +7,27 @@
 # it will not interpret SUMIF, LET, etc cells
 # the row numbering will be off by 1, so row 2 in excel = 1 in R
 
-library(readxl)
+# library(readxl)
 library(dplyr) # need for pipe operation to work
+require(stats)
 
 # tbl=read_excel("Nursing Home.xlsx", sheet="IFR analysis",
 #                      range=cell_cols("U:V"))
 
-readfile <- read.csv("testdata.txt")
+directory="CMS Nursing Home/datasets/"
+prefix="faclevel_202"
+suffix=".csv"
+tbl <- read.csv(paste0(directory, prefix, "0", suffix))
+tbl0 = tbl[,c("Week.Ending","Residents.Weekly.Confirmed.COVID.19","Residents.Weekly.COVID.19.Deaths")]
 
+# now sort by col1 (this works only within a year since year is last)
 
-demarcation_row = 21   # where to make the split. second part is after this row
+tbl0=tbl0[ order(tbl0[,1]),]
+
+# if the database is reasonably valid then we should be able to change the
+# demarcation point to any point and get OR of 1
+
+demarcation_row = 200000   # where to make the split. second part is after this row
 first_part= 1:demarcation_row
 second_part= demarcation_row+1:nrow(tbl)
 sums_before = colSums(tbl[first_part,], na.rm=TRUE)  # sum up to demark row
