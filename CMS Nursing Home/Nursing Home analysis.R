@@ -17,7 +17,7 @@ library(lubridate)
 #                      range=cell_cols("U:V"))
 
 mydir="CMS Nursing Home/datasets/"
-setwd(mydir)
+# avoid using setwd because it's always relative to where you are instead of the project
 prefix="faclevel_202"
 suffix=".csv"
 cases="Residents.Weekly.Confirmed.COVID.19"
@@ -41,7 +41,7 @@ weeks_since = function(date_string){
 # start with 0,0 data,frame and append all the files
 tbl=data.frame()
 for (i in seq(startyear,endyear,1)) {
-  tbl1 <- read.csv(paste0(prefix, i, suffix))
+  tbl1 <- read.csv(paste0(mydir, prefix, i, suffix))
   # tbl1=read.csv(paste0(directory,"test.csv"))
   tbl1 = tbl1[,c(week,cases,deaths)]
   tbl1=tbl1[ order(tbl1[,1]),]  # sort everything by date in column 1
@@ -62,8 +62,6 @@ tbl$Week.Num <- weeks_since(tbl$Week.Ending)
 # basically looking for a "discontinuity" where an intervention made things
 # better or worse.
 
-# now narrow to the columns of interest for computing the sums
-columns=c(cases,deaths)
 
 # calc odds ratio with the given week included in the BEFORE odds
 # calculates the OR in the before window (including that week) vs. the after window
@@ -71,7 +69,9 @@ columns=c(cases,deaths)
 # week calc(52) computes OR through week 52 inclusive as the before so should be strongest signal
 
 calc <- function (week_num, window_size=4){
-  return(week_num+window_size)
+  # now narrow to the columns of interest for computing the sums
+  columns=c(cases,deaths)
+
   # calculate first the week numbers for the break point determinations
   start1=week_num-window_size+1  # start here on the matched row
   end1=week_num+1 # end one row before the row first matching this week num
@@ -83,18 +83,23 @@ calc <- function (week_num, window_size=4){
   row_start2=row_end1+1       # start of AFTER region
   row_end2   <- which(tbl$Week.Num == end2)[1]-1  # end of AFTER region
 
+  # now do sanity check, else return 1
+  if (is.na(row_start1) | is.na(row_end2))
+    return(1) # OR is 1 by default
+
   first_part= row_start1:row_end1
   second_part= row_start2:row_end2
 
   sums_before = colSums(tbl[first_part,columns], na.rm=TRUE)
   sums_after = colSums(tbl[second_part,columns], na.rm=TRUE)
 
+  min_alive = 1  # for a facility, assume alive must be a least 1 so OR doesn't blow up
 
   dead1=sums_before[[deaths]]
-  alive1=sums_before[[cases]]-dead1
+  alive1=max(sums_before[[cases]]-dead1, min_alive)
 
   dead2=sums_after[[deaths]]
-  alive2=sums_after[[cases]]-dead2
+  alive2=max(sums_after[[cases]]-dead2, min_alive)
 
   odds_ratio = (dead2/alive2)/(dead1/alive1)
   # return a string
@@ -106,7 +111,9 @@ calc <- function (week_num, window_size=4){
 
 # end by fill in the table entries using f(x,y)
 
-calc_tbl <- function (week_range=seq(20,30), window_range=seq(2,16,2)){
+calc_tbl <- function (
+    week_range=seq(35,40),
+    window_range=seq(1,2,1)){
 
   df <- data.frame(
     weeks = week_range          # weeks 20 to 52 is first column
@@ -123,7 +130,7 @@ calc_tbl <- function (week_range=seq(20,30), window_range=seq(2,16,2)){
   colnames(df)=c("Week", window_range)
 #  rownames(df)=week_range
 
-  write.csv(df, file = "results.csv", row.names = FALSE) # save result
+  write.csv(df, file = paste0(mydir, "results.csv"), row.names = FALSE) # save result
 
   df    # return the answer too
 }
