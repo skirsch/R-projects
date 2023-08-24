@@ -11,7 +11,8 @@
 # it will not interpret SUMIF, LET, etc cells
 # the row numbering will be off by 1, so row 2 in excel = 1 in R
 
-# library(readxl)
+library(readxl) # to allow read
+library(xlsx)   # allow write to multiple sheets using write.xlsx()
 library(dplyr) # need for pipe operation to work
 require(stats)
 library(lubridate)
@@ -135,7 +136,7 @@ calc <- function (week_num, window_size=4){
 
 calc_tbl <- function (
                 week_range=seq(min_week,max_week),
-                window_range=seq(2,12,2)){
+                window_range=c(1,seq(2,12,2))){
 
 
   m=matrix(nrow=length(week_range), ncol=length(window_range))
@@ -170,4 +171,4 @@ calc_tbl <- function (
 
   df    # return the answer too
 }
-calc_tbl()
+df=calc_tbl()
