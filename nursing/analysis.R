@@ -1,5 +1,9 @@
 # analyze CMS Nursing Home data
 
+# todo:
+# modify the date format after read in the file (or do a sort by date)
+# add column computing a slope ratio
+# plot the IFR and odds ratio
 
 library(xlsx)   # allow write to multiple sheets using write.xlsx()
 library(dplyr) # need for pipe operation to work
@@ -21,7 +25,7 @@ week1="Week.Ending"
 
 # settable parameters
 startyear=0   # 2020
-endyear=0     # 2023 is last file read in
+endyear=3     # 2023 is last file read in
 
 main <- function(){
   # read in CMS file with week added. week week num, provider, state, counts
