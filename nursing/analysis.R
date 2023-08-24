@@ -10,10 +10,14 @@ mydir="nursing/data/"
 prefix="faclevel_202"
 suffix=".csv"
 provider_state="Provider.State"
-cases="Residents.Weekly.Confirmed.COVID.19"
-deaths="Residents.Weekly.COVID.19.Deaths"
+cases1="Residents.Weekly.Confirmed.COVID.19"
+deaths1="Residents.Weekly.COVID.19.Deaths"
 provider="Federal.Provider.Number"
-week="Week.Ending"
+week1="Week.Ending"
+
+# cases="cases"
+# deaths="deaths"
+# week="week"
 
 # settable parameters
 startyear=0   # 2020
@@ -25,20 +29,18 @@ main <- function(){
   # add filter on state here
   df_summary=summarize_cms(df_cms)  # 1 row per week using summarize
   df_odds = cms_odds(df_summary)    # df of cases, dead, alive, IFR, odds
-
   }
 
 read_in_CMS_files <- function(){
   tbl=data.frame()
   for (i in seq(startyear,endyear,1)) {
     tbl1 <- read.csv(paste0(mydir, prefix, i, suffix))
-    tbl1 = tbl1[,c(week,provider, provider_state, cases, deaths)]
+    tbl1 = tbl1[,c(week1,provider, provider_state, cases1, deaths1)]
     tbl1=tbl1[ order(tbl1[,1]),]  # sort everything by date in column 1
     tbl=rbind(tbl,tbl1) #  append the new table entries
   }
   # set new column names for use in summarize
   colnames(tbl)=c("week", "provider", "state", "cases", "deaths")
-  print(tbl)
   tbl    # return the df
 }
 
@@ -49,8 +51,11 @@ summarize_cms <- function (df) (
   summarise(cases = sum(cases,na.rm=TRUE), deaths = sum(deaths, na.rm=TRUE))
 )
 
+# add new computed columns (so long as computed from values in same row it's easy)
 cms_odds <- function (df){
-  df
+  # input has week, cases, deaths column
+  # i'm going to add some new computed columns: ifr and death odds
+  df %>% mutate(ifr = deaths/cases) %>%  mutate(odds = deaths/(cases-deaths))
 }
 
 # run
