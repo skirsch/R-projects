@@ -21,7 +21,7 @@ library(lubridate)
 # tbl=read_excel("Nursing Home.xlsx", sheet="IFR analysis",
 #                      range=cell_cols("U:V"))
 
-mydir="CMS Nursing Home/datasets/"
+mydir="nursing/data/"
 # avoid using setwd because it's always relative to where you are instead of the project
 prefix="faclevel_202"
 suffix=".csv"

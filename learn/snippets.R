@@ -1,5 +1,15 @@
 # not for execution, but just code snippets
 
+getwd()
+setwd(path)
+
+library(readxl) # to allow read
+
+
+
+
+
+
 colnames(temp) <- c('year', 'month', str_replace_all(str_to_lower(s), ' ', '_'))
 
 # Sample data frame
@@ -82,3 +92,95 @@ poptotal <- poptotal %>%
     if (debug) {
         print(head(out_data))
         print(tail(out_data))
+    }
+
+
+ https://dplyr.tidyverse.org/reference/summarise.html
+
+    Other single table verbs: arrange(), filter(), mutate(), reframe(), rename(), select(), slice()
+
+Examples
+# A summary applied to ungrouped tbl returns a single row
+mtcars %>%
+  summarise(mean = mean(disp), n = n())
+#>       mean  n
+#> 1 230.7219 32
+
+# Usually, you'll want to group first
+mtcars %>%
+  group_by(cyl) %>%
+  summarise(mean = mean(disp), n = n())
+#> # A tibble: 3 × 3
+#>     cyl  mean     n
+#>   <dbl> <dbl> <int>
+#> 1     4  105.    11
+#> 2     6  183.     7
+#> 3     8  353.    14
+
+# Each summary call removes one grouping level (since that group
+# is now just a single row)
+mtcars %>%
+  group_by(cyl, vs) %>%
+  summarise(cyl_n = n()) %>%
+  group_vars()
+#> `summarise()` has grouped output by 'cyl'. You can override using the
+#> `.groups` argument.
+#> [1] "cyl"
+
+# BEWARE: reusing variables may lead to unexpected results
+mtcars %>%
+  group_by(cyl) %>%
+  summarise(disp = mean(disp), sd = sd(disp))
+#> # A tibble: 3 × 3
+#>     cyl  disp    sd
+#>   <dbl> <dbl> <dbl>
+#> 1     4  105.    NA
+#> 2     6  183.    NA
+#> 3     8  353.    NA
+
+# Refer to column names stored as strings with the `.data` pronoun:
+var <- "mass"
+summarise(starwars, avg = mean(.data[[var]], na.rm = TRUE))
+#> # A tibble: 1 × 1
+#>     avg
+#>   <dbl>
+#> 1  97.3
+# Learn more in ?rlang::args_data_masking
+
+# In dplyr 1.1.0, returning multiple rows per group was deprecated in favor
+# of `reframe()`, which never messages and always returns an ungrouped
+# result:
+mtcars %>%
+   group_by(cyl) %>%
+   summarise(qs = quantile(disp, c(0.25, 0.75)), prob = c(0.25, 0.75))
+#> Warning: Returning more (or less) than 1 row per `summarise()` group was
+#> deprecated in dplyr 1.1.0.
+#> ℹ Please use `reframe()` instead.
+#> ℹ When switching from `summarise()` to `reframe()`, remember that
+#>   `reframe()` always returns an ungrouped data frame and adjust
+#>   accordingly.
+#> `summarise()` has grouped output by 'cyl'. You can override using the
+#> `.groups` argument.
+#> # A tibble: 6 × 3
+#> # Groups:   cyl [3]
+#>     cyl    qs  prob
+#>   <dbl> <dbl> <dbl>
+#> 1     4  78.8  0.25
+#> 2     4 121.   0.75
+#> 3     6 160    0.25
+#> 4     6 196.   0.75
+#> 5     8 302.   0.25
+#> 6     8 390    0.75
+# ->
+mtcars %>%
+   group_by(cyl) %>%
+   reframe(qs = quantile(disp, c(0.25, 0.75)), prob = c(0.25, 0.75))
+#> # A tibble: 6 × 3
+#>     cyl    qs  prob
+#>   <dbl> <dbl> <dbl>
+#> 1     4  78.8  0.25
+#> 2     4 121.   0.75
+#> 3     6 160    0.25
+#> 4     6 196.   0.75
+#> 5     8 302.   0.25
+#> 6     8 390    0.75
