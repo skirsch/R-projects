@@ -48,8 +48,8 @@ tbl=data.frame()
 for (i in seq(startyear,endyear,1)) {
   tbl1 <- read.csv(paste0(mydir, prefix, i, suffix))
   # tbl1=read.csv(paste0(directory,"test.csv"))
-  row_limits=1:500   # for testing
-  tbl1 = tbl1[row_limits,c(week,provider, cases, deaths)]
+  # row_limits=1:500   # for testing
+  tbl1 = tbl1[,c(week,provider, cases, deaths)]
   tbl1=tbl1[ order(tbl1[,1]),]  # sort everything by date in column 1
   tbl=rbind(tbl,tbl1) #  append the new table entries
 }
@@ -118,10 +118,12 @@ calc <- function (week_num, window_size=4){
   dead2=sums_after[[deaths]]
   alive2=max(sums_after[[cases]]-dead2, min_alive)
 
-  print(sprintf("row1start %g row1end %g row2start %g row2end %g dead1 %g alive1 %g dead2 %g alive2 %g",
-                row_start1, row_end1, row_start2, row_end2, dead1, alive1, dead2, alive2))
 
   odds_ratio = (dead2/alive2)/(dead1/alive1)
+  print(sprintf("row1start %g row1end %g row2start %g row2end %g dead1 %g alive1 %g dead2 %g alive2 %g  odds ratio %g",
+                row_start1, row_end1, row_start2, row_end2, dead1, alive1, dead2, alive2, odds_ratio))
+
+
   # return a string
   # sprintf("Odds ratio=%.3f at break of %g", odds_ratio, row_break/1000)
   return (odds_ratio)
@@ -132,20 +134,29 @@ calc <- function (week_num, window_size=4){
 # end by fill in the table entries using f(x,y)
 
 calc_tbl <- function (
-                week_range=seq(35,38),
-                window_range=seq(1,2,1)){
+                week_range=seq(35,40),
+                window_range=seq(2,12,2)){
+
+
+  m=matrix(nrow=length(week_range), ncol=length(window_range))
+  for (i in seq(length(week_range))) {
+    for (j in seq(length(window_range))) {
+      print(paste("iteration with", i,j, week_range[i], window_range[j]))
+      m[i,j]=calc(week_range[i],window_range[j])
+    }
+  }
 
   # Create combinations of row and column indices
-  indices <- expand.grid(row = week_range, window_range)
+#  indices <- expand.grid(row = week_range, window_range)
 
-  # Apply the function to each combination and store results in a matrix
-  result_matrix <- matrix(apply(indices, 1, function(row) {
-    calc(row[1], row[2])
-  }), nrow = length(week_range), byrow = TRUE)
-  print("result matrix")
-  print(result_matrix)
+# Apply the function to each combination and store results in a matrix
+#  result_matrix <- matrix(apply(indices, 1, function(row) {
+#    calc(row[1], row[2])
+#  }), nrow = length(week_range), byrow = TRUE)
+
+
   # Convert the matrix to a dataframe with appropriate column names
-  df <- as.data.frame(result_matrix)
+  df <- as.data.frame(m)
   # colnames(result_df) <- window_range
 
   # finishing touches: add the week column, then set colnames
