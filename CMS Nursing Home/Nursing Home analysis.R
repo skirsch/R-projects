@@ -29,12 +29,12 @@ deaths="Residents.Weekly.COVID.19.Deaths"
 provider="Federal.Provider.Number"
 week="Week.Ending"
 startyear=0   # 2020
-endyear=0     # 2023 is last file read in
+endyear=1     # 2023 is last file read in
 
 # data is available starts on week 21 (week ending 5/24) week 52 (week ending 12/27)
 # set limits we will refuse to compute if any row is in this range
-min_week=29    # default starting week
-max_week = 40    # last start week to consider so 104 would by end of 2021 156 is end of 2022
+min_week=33    # default starting week
+max_week = 91    # last start week to consider so 104 would by end of 2021 156 is end of 2022
 
 weeks_since = function(date_string){
   # weeks since 1/1/20 start numbering at 1
@@ -98,8 +98,8 @@ calc <- function (week_num, window_size=4){
   print("now doing sanity check")
   # now do sanity check, else return 1
   if (is.na(row_start1) | is.na(row_end2)){
-    print(paste("whoops. NA for values", row_start1, row_end2) )
-    return(1) # OR is 1 by default
+    print(paste("whoops. NA for row or column not found", row_start1, row_end2) )
+    return(NA) # can't compute the value so leave blank
       }
 
   print("now setting up parameters for sums")
@@ -134,7 +134,7 @@ calc <- function (week_num, window_size=4){
 # end by fill in the table entries using f(x,y)
 
 calc_tbl <- function (
-                week_range=seq(35,40),
+                week_range=seq(min_week,max_week),
                 window_range=seq(2,12,2)){
 
 
