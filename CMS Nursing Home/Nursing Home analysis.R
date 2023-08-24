@@ -1,4 +1,8 @@
 # OR analysis
+# Row limits 500 works but numbers are the same per week and OR is too big
+# Row limits 300 gives errors
+
+# problem it calls calc but never calculates ....
 
 # getwd() will get the working directory; defaults to repo root
 # setwd("path/to/new") will change it
@@ -22,6 +26,7 @@ prefix="faclevel_202"
 suffix=".csv"
 cases="Residents.Weekly.Confirmed.COVID.19"
 deaths="Residents.Weekly.COVID.19.Deaths"
+provider="Federal.Provider.Number"
 week="Week.Ending"
 startyear=0   # 2020
 endyear=0     # 2023 is last file read in
@@ -43,7 +48,8 @@ tbl=data.frame()
 for (i in seq(startyear,endyear,1)) {
   tbl1 <- read.csv(paste0(mydir, prefix, i, suffix))
   # tbl1=read.csv(paste0(directory,"test.csv"))
-  tbl1 = tbl1[,c(week,cases,deaths)]
+  row_limits=1:500   # for testing
+  tbl1 = tbl1[row_limits,c(week,provider, cases, deaths)]
   tbl1=tbl1[ order(tbl1[,1]),]  # sort everything by date in column 1
   tbl=rbind(tbl,tbl1) #  append the new table entries
 }
@@ -68,24 +74,35 @@ tbl$Week.Num <- weeks_since(tbl$Week.Ending)
 # so expect strongest odds at week 52
 # week calc(52) computes OR through week 52 inclusive as the before so should be strongest signal
 
+columns=c(cases,deaths)
 calc <- function (week_num, window_size=4){
   # now narrow to the columns of interest for computing the sums
-  columns=c(cases,deaths)
+  # it seems to call the function in parallel if calling it on a column
+  print(paste("entered into  calc",week_num, window_size ))
+  print(paste("week_num", week_num))
 
   # calculate first the week numbers for the break point determinations
   start1=week_num-window_size+1  # start here on the matched row
   end1=week_num+1 # end one row before the row first matching this week num
   end2=week_num+window_size+1        # end one row before this
 
+  # this can throw warning about multiple of shorter length obj if it can't find the start week because [1] won't
+  # work
+  print("starting to find rows")
   row_start1 <- which(tbl$Week.Num == start1)[1]  # starting row
   row_end1 <- which(tbl$Week.Num == end1)[1]-1  # end of first section
 
   row_start2=row_end1+1       # start of AFTER region
   row_end2   <- which(tbl$Week.Num == end2)[1]-1  # end of AFTER region
 
+  print("now doing sanity check")
   # now do sanity check, else return 1
-  if (is.na(row_start1) | is.na(row_end2))
+  if (is.na(row_start1) | is.na(row_end2)){
+    print(paste("whoops. NA for values", row_start1, row_end2) )
     return(1) # OR is 1 by default
+      }
+
+  print("now setting up parameters for sums")
 
   first_part= row_start1:row_end1
   second_part= row_start2:row_end2
@@ -101,6 +118,9 @@ calc <- function (week_num, window_size=4){
   dead2=sums_after[[deaths]]
   alive2=max(sums_after[[cases]]-dead2, min_alive)
 
+  print(sprintf("row1start %g row1end %g row2start %g row2end %g dead1 %g alive1 %g dead2 %g alive2 %g",
+                row_start1, row_end1, row_start2, row_end2, dead1, alive1, dead2, alive2))
+
   odds_ratio = (dead2/alive2)/(dead1/alive1)
   # return a string
   # sprintf("Odds ratio=%.3f at break of %g", odds_ratio, row_break/1000)
@@ -112,21 +132,26 @@ calc <- function (week_num, window_size=4){
 # end by fill in the table entries using f(x,y)
 
 calc_tbl <- function (
-    week_range=seq(35,40),
-    window_range=seq(1,2,1)){
+                week_range=seq(35,38),
+                window_range=seq(1,2,1)){
 
-  df <- data.frame(
-    weeks = week_range          # weeks 20 to 52 is first column
-  )
+  # Create combinations of row and column indices
+  indices <- expand.grid(row = week_range, window_range)
 
+  # Apply the function to each combination and store results in a matrix
+  result_matrix <- matrix(apply(indices, 1, function(row) {
+    calc(row[1], row[2])
+  }), nrow = length(week_range), byrow = TRUE)
+  print("result matrix")
+  print(result_matrix)
+  # Convert the matrix to a dataframe with appropriate column names
+  df <- as.data.frame(result_matrix)
+  # colnames(result_df) <- window_range
 
-  for (j in window_range){
-    ans=calc(df[,1],j)
-    df=cbind(df,ans)
-  }
+  # finishing touches: add the week column, then set colnames
+  #  df=df[,-1]    # remove the first column
+  df=cbind(week_range, df)
 
-# finishing touches: remove helper column
-#  df=df[,-1]    # remove the first column
   colnames(df)=c("Week", window_range)
 #  rownames(df)=week_range
 
