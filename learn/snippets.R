@@ -1,12 +1,43 @@
 # not for execution, but just code snippets
+rm(var) to unbind a variable
+Yes, the opposite of lag() is lead(). While lag() looks at previous values in a column, lead() looks at values that come after a specific row.
+
+Here's an explanation of the default parameter in both lag() and lead():
+
+result_tib <- tib %>%
+  mutate(
+    sum_shifted_columns = column1 + lag(column2, n = 3, default = 0)
+  )
+
+LAG pushes the column LOWER
+LEAD pushes the column HIGHER.
+
+In lag() and lead(), the default parameter specifies the value to be used when the requested lag/lead is not possible. For example, if you want to look back three rows using lag() or look forward three rows using lead() for the first few rows of a data frame, there won't be enough rows to satisfy the lag/lead. In such cases, the default value is used.
+
+# change type of a column
+# df  %>% mutate_at(vars(week), mdy)
+
+# sort df by column week...
+sorted_tib <- tib %>%
+  arrange(date_column)
 
 getwd()
 setwd(path)
 
 library(readxl) # to allow read
 
+tibble
+data types:
+  https://tibble.tidyverse.org/articles/types.html
 
+select() selects columns from data
+filter() subsets rows of data
+group_by() aggregates data
+summarise() summarises data (calculating summary statistics)
+arrange() sorts data
+mutate() creates new variables
 
+#tib$date_column <- as.Date(tib$date_column)
 
 
 
