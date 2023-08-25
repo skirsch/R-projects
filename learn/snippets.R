@@ -1,4 +1,10 @@
 # not for execution, but just code snippets
+
+RDS file is native format for file read/write
+
+variable scoping: if function modifies a variable or it is an argument, it is local. If reads it only, it will read the global
+
+
 rm(var) to unbind a variable
 Yes, the opposite of lag() is lead(). While lag() looks at previous values in a column, lead() looks at values that come after a specific row.
 

@@ -1,9 +1,9 @@
 # analyze CMS Nursing Home data
 
 # todo:
-# modify the date format after read in the file (or do a sort by date)
-# add column computing a slope ratio
-# plot the IFR and odds ratio
+# derivative of IFR and deriv of odds
+# plot second derivative
+# plot the IFR and odds ratio and
 
 library(xlsx)   # allow write to multiple sheets using write.xlsx()
 library(dplyr) # need for pipe operation to work
@@ -30,9 +30,8 @@ endyear=3     # 2023 is last file read in
 main <- function(){
   # read in CMS file with week added. week week num, provider, state, counts
   df_cms=read_in_CMS_files()
-  # add filter on state here
-  df_summary=group_by_week(df_cms)  # 1 row per week using summarize
-  df_odds = cms_odds(df_summary)    # add in: IFR, odds, and derivative
+  # add filter on state here e.g., calif
+  df_cms %>% combine_weeks() %>% calc_stats()
   }
 
 read_in_CMS_files <- function(){
@@ -48,23 +47,28 @@ read_in_CMS_files <- function(){
   tbl %>% mutate_at(vars(week), mdy)  # set date type for the date
 }
 
-# add up cases and deaths so there is just
+# combine cases and deaths with the same week into one row
 # one row per week (instead of 15,000 rows)
-group_by_week <- function (df) {
-  df %>%
-  group_by(week) %>%
+# need to filter out bad actors BEFORE combining rows
+combine_weeks <- function (df) {
+  df %>% filter_out_bad_actors() %>% group_by(week) %>%
   summarise(cases = sum(cases,na.rm=TRUE), deaths = sum(deaths, na.rm=TRUE))
 }
 
+# remove facilities with bogus counts
+providers_to_remove <- c(102, 104)
+filter_out_bad_actors <- function(df){
+  df %>% filter(!provider %in% providers_to_remove)
+}
+
 # add new computed columns (so long as computed from values in same row it's easy)
-cms_odds <- function (df){
+calc_stats <- function (df){
   # input has week, cases, deaths columns
   # add 3 new computed columns: ifr, dead:alive odds, and derivative
   df %>% mutate(ifr = deaths/cases) %>%
          mutate(odds = deaths/(cases-deaths)) %>%
-         mutate(deriv1 = ifr - lag(ifr, n=1, default=0)) %>%
-         mutate(deriv2 = ifr - lag(ifr, n=2, default=0)) %>%
-         mutate(deriv3 = ifr - lag(ifr, n=3, default=0))
+         mutate(ifr8 =   ifr - lag(ifr, n=8, default=0)) %>%
+         mutate(odds8 = odds - lag(odds, n=8, default=0))
 }
 
 # run
