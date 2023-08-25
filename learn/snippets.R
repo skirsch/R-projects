@@ -4,6 +4,18 @@ RDS file is native format for file read/write
 
 variable scoping: if function modifies a variable or it is an argument, it is local. If reads it only, it will read the global
 
+life_expec <- life_expec %>%
+  filter(Race == "All Races", Sex == "Both Sexes")
+
+# vector with column headers
+
+x=c(a="12", b="33")
+> x
+   a    b
+"12" "33"
+
+so now can use x["a"] or x[1] to get 12
+
 
 rm(var) to unbind a variable
 Yes, the opposite of lag() is lead(). While lag() looks at previous values in a column, lead() looks at values that come after a specific row.
@@ -221,3 +233,26 @@ mtcars %>%
 #> 4     6 196.   0.75
 #> 5     8 302.   0.25
 #> 6     8 390    0.75
+#>
+#>
+#>
+#> library(ggplot2)
+
+# Sample data
+time <- c(1, 2, 3, 4, 5)
+series1 <- c(10, 15, 12, 18, 20)
+series2 <- c(8, 10, 14, 16, 22)
+
+# Create a data frame
+data <- data.frame(time, series1, series2)
+
+# Create the line plot
+line_plot <- ggplot(data, aes(x = time)) +
+  geom_line(aes(y = series1, color = "Series 1")) +
+  geom_line(aes(y = series2, color = "Series 2")) +
+  labs(title = "Line Graph with Two Series",
+       x = "Time",
+       y = "Value") +
+  scale_color_manual(values = c("Series 1" = "blue", "Series 2" = "red"))
+
+print(line_plot)
