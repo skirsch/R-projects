@@ -1,11 +1,12 @@
 # analyze CMS Nursing Home data
 
 # todo:
+# look at non-COVID ACM
 # plot of the IFR and odds ratio and
 # write out answer as Excel
 # locate bogus provider by grouping on the provider instead of the date
 
-library(xlsx)   # allow write to multiple sheets using write.xlsx()
+library(openxlsx2)   # write out xlsx; doesn't need java
 library(dplyr) # need for pipe operation to work
 require(stats)
 library(lubridate)
@@ -17,6 +18,7 @@ suffix=".csv"
 provider_state="Provider.State"
 cases1="Residents.Weekly.Confirmed.COVID.19"
 deaths1="Residents.Weekly.COVID.19.Deaths"
+acm1="Residents.Weekly.All.Deaths"
 provider="Federal.Provider.Number"
 week1="Week.Ending"
 
@@ -39,21 +41,25 @@ read_in_CMS_files <- function(){
   tbl=data.frame()
   for (i in seq(startyear,endyear,1)) {
     tbl1 <- read.csv(paste0(mydir, prefix, i, suffix))
-    tbl1 = tbl1[,c(week1,provider, provider_state, cases1, deaths1)]
-    tbl1=tbl1[ order(tbl1[,1]),]  # sort everything by date in column 1
+    tbl1 = tbl1[,c(week1,provider, provider_state, cases1, deaths1, acm1)]
+    # sort everything by date in column 1 which makes debugging a little easier
+    tbl1=tbl1[ order(tbl1[,1]),]
     tbl=rbind(tbl,tbl1) #  append the new table entries
   }
-  # set new column names for use in summarize
-  colnames(tbl)=c("week", "provider", "state", "cases", "deaths")
+  # set new column names for use in summarize inside of combine_weeks
+  colnames(tbl)=c("week", "provider", "state", "cases", "deaths", "acm")
   tbl %>% mutate_at(vars(week), mdy)  # set date type for the date
 }
 
-# combine cases and deaths with the same week into one row
+# combine cases and deaths with the same week into one row for each week
 # one row per week (instead of 15,000 rows)
 # need to filter out bad actors BEFORE combining rows
 combine_weeks <- function (df) {
   df %>% filter_out_bad_actors() %>% group_by(week) %>%
-  summarise(cases = sum(cases,na.rm=TRUE), deaths = sum(deaths, na.rm=TRUE))
+  summarise(cases = sum(cases,na.rm=TRUE),
+            deaths = sum(deaths, na.rm=TRUE),
+            acm = sum(acm, na.rm=TRUE)
+            )
 }
 
 # remove facilities with bogus counts (if we can find any)
@@ -66,8 +72,9 @@ filter_out_bad_actors <- function(df){
 # add new computed columns (so long as computed from values in same row it's easy)
 calc_stats <- function (df){
   # input has week, cases, deaths columns
-  # add 3 new computed columns: ifr, dead:alive odds, and derivative
-  df %>% mutate(ifr = deaths/cases) %>%
+  # add 4 new computed columns: ncacm, ifr, dead:alive odds, and derivatives
+  df %>% mutate(ncacm = acm-deaths) %>%
+         mutate(ifr = deaths/cases) %>%
          mutate(odds = deaths/(cases-deaths)) %>%
          mutate(ifr8 =   ifr - lag(ifr, n=8, default=0)) %>%
          mutate(odds8 = odds - lag(odds, n=8, default=0))

@@ -2,6 +2,10 @@
 
 RDS file is native format for file read/write
 
+read/write xls spreadsheets
+can creeate wb and add to them and write it outer()
+https://janmarvin.github.io/openxlsx2/articles/openxlsx2_charts_manual.html
+
 variable scoping: if function modifies a variable or it is an argument, it is local. If reads it only, it will read the global
 
 life_expec <- life_expec %>%
