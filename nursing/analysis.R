@@ -1,10 +1,10 @@
 # analyze CMS Nursing Home data
 
 # todo:
-# calculate OR 8 weeks, not just derivative... Odds at current /. 4 weeks ago
-# on same graph plot cases and IFR ratio
+# summarize data on a per facility basis so can weed out those with 0 IFR and high IFR
+# write out the two tables as Excel sheets
 # plot of the IFR and odds ratio and
-# write out answer as Excel
+
 # locate bogus provider by grouping on the provider instead of the date
 
 library(openxlsx2)   # write out xlsx; doesn't need java
@@ -80,7 +80,7 @@ calc_stats <- function (df){
          mutate(odds = deaths/(cases-deaths)) %>%
          mutate(odds_ratio=odds/lag(odds, n=8, default=0)) %>%
          mutate(ifr8 =   ifr - lag(ifr, n=8, default=0)) %>%
-         mutate(odds8 = odds - lag(odds, n=8, default=0))
+         mutate(odds8 = odds - lag(odds, n=8, default=0)) # change in odds
 }
 
 # plot multiple lines on a graph
