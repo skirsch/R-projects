@@ -34,7 +34,7 @@ endyear=3     # 2023 is last file read in
 
 main <- function(){
   # read in CMS file with week added. week week num, provider, state, counts
-  df=read_in_CMS_files()
+  df=read_in_CMS_files() %>% filter_out_bad_actors()
   # add filter on state here if wanted e.g., calif
   df %>% combine_weeks() %>% calc_stats()  # %>% plot_results()
 }
@@ -55,9 +55,8 @@ read_in_CMS_files <- function(){
 
 # combine cases and deaths with the same week into one row for each week
 # one row per week (instead of 15,000 rows)
-# need to filter out bad actors BEFORE combining rows
-combine_weeks <- function (df) {
-  df %>% filter_out_bad_actors() %>% group_by(week) %>%
+combine_by <- function (df, col_name=week) {
+  df %>% group_by(col_name) %>%
   summarise(cases = sum(cases,na.rm=TRUE),
             deaths = sum(deaths, na.rm=TRUE),
             acm = sum(acm, na.rm=TRUE)
