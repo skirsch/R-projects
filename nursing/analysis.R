@@ -24,20 +24,44 @@ acm1="Residents.Weekly.All.Deaths"
 provider="Federal.Provider.Number"
 week1="Week.Ending"
 
-# cases="cases"
-# deaths="deaths"
-# week="week"
+cases="cases"
+deaths="deaths"
+week="week"
+provider="provider"
+provider_state="state"
+acm="acm"
+
+# columns to summarize on
+columns_of_interest=c(week, provider, provider_state)
+
 
 # settable parameters
 startyear=0   # 2020
-endyear=3     # 2023 is last file read in
+endyear=0     # 2023 is last file read in
 
 main <- function(){
   # read in CMS file with week added. week week num, provider, state, counts
-  df=read_in_CMS_files() %>% filter_out_bad_actors()
-  # add filter on state here if wanted e.g., calif
-  df %>% combine_weeks() %>% calc_stats()  # %>% plot_results()
+  df=read_in_CMS_files() %>%
+    limit_records() %>%
+    analyze_records()
+  # return the full set of dataframes returned by analyze records including the
+  # master
 }
+
+limit_records
+   head(45000)  # limit number of records
+  filter_out_bad_actors()  %>%
+  # add filter on state here if wanted to limit everything below, e.g., calif
+  #  df=df %>% filter_select(state, concat of states to include)
+
+
+analyze <- function(df)
+  # want to analyze by state, provider, week
+  df_list=list(master=df)    # first df is the "master" df with all values
+  for (col_name in c(week, provider, provider_state))
+    df_list[df_name] = df %>% combine_by(col_name) %>% calc_stats()
+
+
 
 read_in_CMS_files <- function(){
   tbl=data.frame()
@@ -49,7 +73,7 @@ read_in_CMS_files <- function(){
     tbl=rbind(tbl,tbl1) #  append the new table entries
   }
   # set new column names for use in summarize inside of combine_weeks
-  colnames(tbl)=c("week", "provider", "state", "cases", "deaths", "acm")
+  colnames(tbl)=c(week, provider, state, cases, deaths, acm)
   tbl %>% mutate_at(vars(week), mdy)  # set date type for the date
 }
 
@@ -64,10 +88,17 @@ combine_by <- function (df, col_name=week) {
 }
 
 # remove facilities with bogus counts (if we can find any)
-providers_to_remove <- c(102, 104)
+providers_to_remove <- c(102, 104)  concatenation of providers to remove
 filter_out_bad_actors <- function(df){
   df # nothing to filter so far. use below line if find a bogus provider
-  # df %>% filter(!provider %in% providers_to_remove)
+  # filter out records at start based on provider number
+    # df %>% filter(!provider %in% providers_to_remove)
+}
+
+# only keep the records of a df where the col, value is a match, e.g.,
+# provider_state, seq("CA", "OR")
+filter_select <- function(df, col, val){
+  df %>% filter(col %in% val)
 }
 
 # add new computed columns (so long as computed from values in same row it's easy)
