@@ -1,7 +1,8 @@
 # analyze CMS Nursing Home data
 
 # todo:
-# look at non-COVID ACM
+# calculate OR 8 weeks, not just derivative... Odds at current /. 4 weeks ago
+# on same graph plot cases and IFR ratio
 # plot of the IFR and odds ratio and
 # write out answer as Excel
 # locate bogus provider by grouping on the provider instead of the date
@@ -11,6 +12,7 @@ library(dplyr) # need for pipe operation to work
 require(stats)
 library(lubridate)
 library(ggplot2)
+library(rlang)
 
 mydir="nursing/data/"
 prefix="faclevel_202"
@@ -34,7 +36,7 @@ main <- function(){
   # read in CMS file with week added. week week num, provider, state, counts
   df=read_in_CMS_files()
   # add filter on state here if wanted e.g., calif
-  df %>% combine_weeks() %>% calc_stats() %>% plot_results()
+  df %>% combine_weeks() %>% calc_stats()  # %>% plot_results()
 }
 
 read_in_CMS_files <- function(){
@@ -76,39 +78,44 @@ calc_stats <- function (df){
   df %>% mutate(ncacm = acm-deaths) %>%
          mutate(ifr = deaths/cases) %>%
          mutate(odds = deaths/(cases-deaths)) %>%
+         mutate(odds_ratio=odds/lag(odds, n=8, default=0)) %>%
          mutate(ifr8 =   ifr - lag(ifr, n=8, default=0)) %>%
          mutate(odds8 = odds - lag(odds, n=8, default=0))
 }
 
-# generic plot function, column names are at the end
-plot_result <- function(df, mytitle, xlabel, ylabel, x_name, y_name, y2_name){
-  line_plot <- ggplot(df, aes(x = x_name)) +
-  geom_line(aes(y = y_name, color = y_name)) +
-  geom_line(aes(y = y2_name, color = y2_name)) +
-  labs(title = mytitle,
-       x = xlabel,
-       y = ylabel) +
-  scale_color_manual(values = c(y_name = "blue", y2_name = "red"))
+# plot multiple lines on a graph
+# Usage:
+# plot_multi_line(df, x_col = "Time", y_cols = c("Y1", "Y2"))
 
-  print(line_plot)
+plot_multi_line <- function(df, x_col, y_cols, mytitle="My graph", ytitle="Number") {
+  myplot=ggplot(df, aes(x = .data[[x_col]]))+
+    scale_color_manual(values = c("blue", "red"))+      # ,"green","orange","magenta"))
+    # now we can add a line plot for each y_col sent in
+  for (i in seq(1,length(y_cols))){
+    myplot=myplot+geom_line(aes(y = .data[[y_cols[i]]], color = y_cols[i]), linewidth = 1)
+  }
+  myplot=myplot+
+        labs(title = mytitle,
+         x = x_col,
+         y = ytitle,
+         color = "Legend") +
+    # scale_x_continuous(breaks = seq(min(.data[[x_col]]), max(.data[[x_col]]), by = 1)) +
+    scale_x_continuous(n.breaks=10, minor_breaks=seq(1,30)) +
+
+  theme_minimal()
+  print(myplot)
+  df
 }
+
 
 plot_results <- function(df){
   # call plot_result several times for the plots desired
+  df  %>% # ignore first row since very odd
+    plot_multi_line('week', c('cases', 'deaths'), "Cases and deaths", "Count" )
   df   # return df
 }
 
+
 # run
 df=main()
-# this didn't work
-plot_result(df, "title", "x label", "y label", 'week', 'cases', 'deaths')
-
-# this worked!!!
-
-abc="week"
-df %>% # data layer
-  ggplot(aes(x = week, y = cases)) + # axes layer
-  geom_line() + # geom layer
-  labs(  # annotations layer
-  title = "my cases per week") %>% print()
 

@@ -1,5 +1,52 @@
 # not for execution, but just code snippets
 
+https://plotly.com/r/multiple-axes/ for plotly has great example
+
+if you assign a variable as last operation, interpreter will print NOTHING
+if you have a variable alone, interpreter will print it. This is why graph
+will appear or not in ggplot
+
+for ggplot, it creates a ggplot object, so you can add them together, but you
+MUST use () around the addition
+because pipe tightly binds to the final
+
+# this doesn't work because "i" inside the data will be taken from the wrong context
+for (i in range(1,2))
+      x=x+  geom_line(aes(y = .data[[y_cols[i]]], color = y_cols[i]), linewidth = i)
+
+1+2+3 > print()
+will print 3, then 6
+
+aes_string is used for plots to pass in the values
+quote, unquote
+substitute can be used for
+c(a="1". b="7")
+
+substitute(x <- c(x=1+a, b=2), list (a = 7))
+
+> substitute(a <- x + 1, list(x = 1)) # must use the <-
+
+
+but this is deprecated.
+
+like you can't say  a= 1+3+3 %>% print()
+
+you can only pipe together FUNCTIONS, not additions
+
+
+plot_result <- function(df, mytitle, xlabel, ylabel, x_name, y_name, y2_name){
+  line_plot <- ggplot(df, aes(x = x_name)) +
+  geom_line(aes(y = y_name, color = y_name)) +
+  geom_line(aes(y = y2_name, color = y2_name)) +
+  labs(title = mytitle,
+       x = xlabel,
+       y = ylabel) +
+  scale_color_manual(values = c(y_name = "blue", y2_name = "red"))
+
+  print(line_plot)
+
+
+
 RDS file is native format for file read/write
 
 read/write xls spreadsheets
@@ -19,6 +66,12 @@ x=c(a="12", b="33")
 "12" "33"
 
 so now can use x["a"] or x[1] to get 12
+
+df ... slice(-3)   # will remove just row #3
+.... slice(-3:-5)  # will remove rows 3 thru 5
+.... slice(-3,-5)  # will remove rows 3 and remove row 5
+... slice(3,5)    # will include just these rows... so never mix positve and negatives in same call
+... slice (2:n()) # will return 2 to the end
 
 
 rm(var) to unbind a variable
@@ -260,3 +313,18 @@ line_plot <- ggplot(data, aes(x = time)) +
   scale_color_manual(values = c("Series 1" = "blue", "Series 2" = "red"))
 
 print(line_plot)
+
+plot_result <- function(df, mytitle, xlabel, ylabel, x_name, y_name, y2_name){
+
+  # try with hard coded fields
+
+  # the parens around the addition are important, because pipe tightly binds
+  # so in a sum, it will sum the final element piped into print()
+
+  myplot=df %>%  slice(2:n()) %>% (ggplot(aes(x = week, y = ncacm)) + # axes layer
+  geom_line() + # geom layer
+  labs(  # annotations layer
+  title = "Non-COVID ACM per week")) %>% print()
+
+  print("finished doing plot")
+}
