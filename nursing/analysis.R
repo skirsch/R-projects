@@ -1,6 +1,7 @@
 # analyze CMS Nursing Home data
 
 # todo:
+# compute OR, RRR, ARR relative to keyframe
 # summarize data on a per facility basis so can weed out those with 0 IFR and high IFR
 # write out the two tables as Excel sheets
 # plot of the IFR and odds ratio and
@@ -15,24 +16,29 @@ library(ggplot2)
 library(rlang)
 
 mydir="nursing/data/"
-prefix="faclevel_202"
-suffix=".csv"
-provider_state="Provider.State"
+file_prefix=paste0(mydir,"faclevel_202")
+file_suffix=".csv"
+output_file=paste0(mydir,"nursing.xlsx")
+
+# original field names
+provider_state1="Provider.State"
 cases1="Residents.Weekly.Confirmed.COVID.19"
 deaths1="Residents.Weekly.COVID.19.Deaths"
 acm1="Residents.Weekly.All.Deaths"
-provider="Federal.Provider.Number"
+provider_num1="Federal.Provider.Number"
 week1="Week.Ending"
+Key_row_num = 29   # vax rollout is Dec 11 so this is week before that (12/6/2020)
 
+# short names we use here
 cases="cases"
 deaths="deaths"
 week="week"
-provider="provider"
+provider_num="provider"
 provider_state="state"
 acm="acm"
 
 # columns to summarize on
-columns_of_interest=c(week, provider, provider_state)
+columns_of_interest=c(week, provider_num, provider_state)
 
 
 # settable parameters
@@ -42,18 +48,23 @@ endyear=0     # 2023 is last file read in
 main <- function(){
   # read in CMS file with week added. week week num, provider, state, counts
   df=read_in_CMS_files() %>%
-    limit_records() %>%
-    analyze_records() %>% # this returns a LIST of dataframes for saving
+    limit_records()
+  key_row=load_key_row(df)
+  df %>%
+    analyze_records(key_row) %>% # this returns a LIST of dataframes for saving
     save_to_disk()   # returns the saved list
   # return the full set of dataframes returned by analyze records including the
   # master
 }
 
-save_to_disk <- function (dfl){
-  print(length(dfl))
+# get the comparison row from the df and return it. Others will need it
+load_key_row <- function(df){
+  df[key_row_num,]   # without the comma, returns col 1. This returns all columns
 }
 
-limit_records <- function(){
+# use this to limit records we are processing
+# including head, remove bad actors and selecting a concatentation of states
+limit_records <- function(df){
   df %>%
    head(45000) #  %>%  limit number of records for debug
   # filter_out_bad_actors()  %>%
@@ -61,24 +72,26 @@ limit_records <- function(){
   #    filter_select(state, c('CA')
 }
 
-analyze <- function(df){
-  # want to analyze by state, provider, week
-  df_list=list(master=df)    # first df is the "master" df with all values
-  for (col_name in c(week, provider, provider_state))
-    df_list[df_name] = df %>% combine_by(col_name) %>% calc_stats()
+
+analyze_records <- function(df,key_row){
+  # want to analyze by state, provider_num, week
+  # df_list=list(master=df)    # initialize the list df is the "master" df with all values
+  df_list=list()      # no need to write out the master df because we have everything we need
+  for (col_name in c(week, provider_num, provider_state))
+    df_list[col_name] = df %>% combine_by(col_name) %>% calc_stats(key_row)
 }
 
 read_in_CMS_files <- function(){
   tbl=data.frame()
   for (i in seq(startyear,endyear,1)) {
-    tbl1 <- read.csv(paste0(mydir, prefix, i, suffix))
-    tbl1 = tbl1[,c(week1,provider, provider_state, cases1, deaths1, acm1)]
+    tbl1 <- read.csv(paste0(file_prefix, i, file_suffix))
+    tbl1 = tbl1[,c(week1,provider_num1, provider_state1, cases1, deaths1, acm1)]
     # sort everything by date in column 1 which makes debugging a little easier
     tbl1=tbl1[ order(tbl1[,1]),]
     tbl=rbind(tbl,tbl1) #  append the new table entries
   }
   # set new column names for use in summarize inside of combine_weeks
-  colnames(tbl)=c(week, provider, state, cases, deaths, acm)
+  colnames(tbl)=c(week, provider_num, provider_state, cases, deaths, acm)
   tbl %>% mutate_at(vars(week), mdy)  # set date type for the date
 }
 
@@ -93,11 +106,11 @@ combine_by <- function (df, col_name=week) {
 }
 
 # remove facilities with bogus counts (if we can find any)
-providers_to_remove= c(102, 104)  # concatenation of providers to remove
+provider_nums_to_remove= c(102, 104)  # concatenation of providers to remove
 filter_out_bad_actors <- function(df){
   df # nothing to filter so far. use below line if find a bogus provider
   # filter out records at start based on provider number
-    # df %>% filter(!provider %in% providers_to_remove)
+    # df %>% filter(!provider_num %in% provider_nums_to_remove)
 }
 
 # only keep the records of a df where the col, value is a match, e.g.,
@@ -107,10 +120,11 @@ filter_select <- function(df, col, val){
 }
 
 # add new computed columns (so long as computed from values in same row it's easy)
-calc_stats <- function (df){
+calc_stats <- function (df, key_row){
   # input has week, cases, deaths columns
   # add 4 new computed columns: ncacm, ifr, dead:alive odds, and derivatives
-  df %>% mutate(ncacm = acm-deaths) %>%
+  # key_row has the elements we need to compute the stats and is passed in
+    df %>% mutate(ncacm = acm-deaths) %>%
          mutate(ifr = deaths/cases) %>%
          mutate(odds = deaths/(cases-deaths)) %>%
          mutate(odds_ratio=odds/lag(odds, n=8, default=0)) %>%
@@ -143,14 +157,29 @@ plot_multi_line <- function(df, x_col, y_cols, mytitle="My graph", ytitle="Numbe
 }
 
 
-plot_results <- function(df){
+plot_results <- function(df_list){
   # call plot_result several times for the plots desired
-  df  %>% # ignore first row since very odd
+  df_list  %>% # ignore first row since very odd
     plot_multi_line('week', c('cases', 'deaths'), "Cases and deaths", "Count" )
   df   # return df
 }
 
+save_to_disk <- function (dataframe_list){
+
+  # Create a new Excel workbook
+  wb <- createWorkbook()
+
+  # Loop over the list and add each dataframe to a separate worksheet
+  for (sheet_name in names(dataframe_list)) {
+    addWorksheet(wb, sheet_name)
+    writeData(wb, sheet_name, dataframe_list[[sheet_name]])
+  }
+  # Save the workbook to the specified output file
+  saveWorkbook(wb, output_file, overwrite = TRUE)
+  dataframe_list  # return the dataframe_list for others to process
+}
+
 
 # run
-df=main()
+dfl=main()
 

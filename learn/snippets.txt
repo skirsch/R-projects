@@ -397,8 +397,22 @@ retrieved_df2 <- data_frame_collection$mydataframe2
 print(retrieved_df1)
 print(retrieved_df2)
 
-c(1,3,4) are 3 values just like seq(1,3)
-list(1,2,3) is a single value
+x=c(1,3,4) are 3 values just like seq(1,3)
+y=list(1,2,3) is a single value
+
+if named values then
+
+ATOMIC VECTORS
+x=c(a=32, b=23)
+x[["a"]] will always return the value in that position
+x["a"] will return a named value
+
+LISTS
+y["a"] will return a list of named objects
+y[["a"]] will return contents of the slot
+y$a will return contents of the named  slot if y is a list
+but x$a returns an error
+
 
 
 # Skip the first 5 rows using the pipe operator
@@ -407,3 +421,20 @@ result <- df %>%
 
 head tail also work. can use - value for the complement so
 head(5) is first 5 rows and head(-5) is all but first 5 rows
+
+# Create a list of dataframes with corresponding sheet names
+dataframe_list <- list(sheeta = data.frame(x = 1:3, y = 4:6),
+                        sheetb = data.frame(a = 7:9, b = 10:12))
+
+
+PIPE
+
+If you pipe in a concat, it calls the function with those arguments in the concat
+and returns the concat of the results
+
+if you pipe in a list, it treats it as ONE object.
+
+f=function(a,b=1,c=2) a+1
+c(6,343,343,343,345) %>% f()
+[1] "612"   "34312" "34312" "34312" "34512"
+>
