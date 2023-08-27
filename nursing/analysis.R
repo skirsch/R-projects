@@ -43,25 +43,30 @@ main <- function(){
   # read in CMS file with week added. week week num, provider, state, counts
   df=read_in_CMS_files() %>%
     limit_records() %>%
-    analyze_records()
+    analyze_records() %>% # this returns a LIST of dataframes for saving
+    save_to_disk()   # returns the saved list
   # return the full set of dataframes returned by analyze records including the
   # master
 }
 
-limit_records
-   head(45000)  # limit number of records
-  filter_out_bad_actors()  %>%
+save_to_disk <- function (dfl){
+  print(length(dfl))
+}
+
+limit_records <- function(){
+  df %>%
+   head(45000) #  %>%  limit number of records for debug
+  # filter_out_bad_actors()  %>%
   # add filter on state here if wanted to limit everything below, e.g., calif
-  #  df=df %>% filter_select(state, concat of states to include)
+  #    filter_select(state, c('CA')
+}
 
-
-analyze <- function(df)
+analyze <- function(df){
   # want to analyze by state, provider, week
   df_list=list(master=df)    # first df is the "master" df with all values
   for (col_name in c(week, provider, provider_state))
     df_list[df_name] = df %>% combine_by(col_name) %>% calc_stats()
-
-
+}
 
 read_in_CMS_files <- function(){
   tbl=data.frame()
@@ -88,7 +93,7 @@ combine_by <- function (df, col_name=week) {
 }
 
 # remove facilities with bogus counts (if we can find any)
-providers_to_remove <- c(102, 104)  concatenation of providers to remove
+providers_to_remove= c(102, 104)  # concatenation of providers to remove
 filter_out_bad_actors <- function(df){
   df # nothing to filter so far. use below line if find a bogus provider
   # filter out records at start based on provider number
