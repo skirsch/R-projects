@@ -1,15 +1,7 @@
 # analyze CMS Nursing Home data
 
 # todo:
-# get "group by" working
-
-# get keyframe working f
-# look for anomaly when group by provider
-# see if state data is consistent
-# compute OR, RRR, ARR relative to the keyframe
-
-# write this up, survey, pfizer study on
-#
+# compute OR, RRR, ARR relative to keyframe
 # summarize data on a per facility basis so can weed out those with 0 IFR and high IFR
 # write out the two tables as Excel sheets
 # plot of the IFR and odds ratio and
@@ -110,9 +102,6 @@ combine_by <- function (df, col_name=week) {
   field_symbol <- sym(col_name)
 
   # this will output 4 column df including the field you are grouping by
-  # so you'll only see weeks when group by weeks,
-  # you'll only see providers (and 3 other columns) when group by providers
-  # etc.
   df %>% group_by(!!field_symbol) %>%
   summarise(cases = sum(cases,na.rm=TRUE),
             deaths = sum(deaths, na.rm=TRUE),
@@ -179,24 +168,21 @@ plot_results <- function(df_list){
   df   # return df
 }
 
-# https://cran.r-project.org/web/packages/openxlsx2/openxlsx2.pdf
 save_to_disk <- function (dataframe_list){
 
   # Create a new Excel workbook
-  wb <- wb_workbook()
+  wb <- createWorkbook()
 
   # Loop over the list and add each dataframe to a separate worksheet
-  # if the dataframes in the list don't have a name, nothing will be written
-  # so pass in list(sheet1=df1, mysheet2=df2)
   for (sheet_name in names(dataframe_list)) {
-    print(sheet_name)
-    wb$add_worksheet(sheet_name)
-    wb$add_data(x=dataframe_list[[sheet_name]])
+    addWorksheet(wb, sheet_name)
+    writeData(wb, sheet_name, dataframe_list[[sheet_name]])
   }
   # Save the workbook to the specified output file
-  wb$save(output_file)
+  saveWorkbook(wb, output_file, overwrite = TRUE)
   dataframe_list  # return the dataframe_list for others to process
 }
+
 
 # run
 dfl=main()

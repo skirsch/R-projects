@@ -438,3 +438,44 @@ f=function(a,b=1,c=2) a+1
 c(6,343,343,343,345) %>% f()
 [1] "612"   "34312" "34312" "34312" "34512"
 >
+
+solving the expects a hard symbol instead of a variable problem
+
+df <- data.frame(group_col = c("A", "B", "A", "B"),
+                 value = c(10, 20, 30, 40))
+
+# Variable containing the field name
+field_name <- "group_col"
+
+# Convert variable to a symbol using sym()
+field_symbol <- sym(field_name)
+
+# Use !! to evaluate the variable as a column name in group_by
+grouped_df <- df %>%
+  group_by(!!field_symbol) %>%
+  summarize(total = sum(value))
+
+# Print the grouped dataframe
+print(grouped_df)
+
+calc_stats <- function (df, key_row_df){
+  # input has week, cases, deaths columns
+  # add 4 new computed columns: ncacm, ifr, dead:alive odds, and derivatives
+  # key_row_df has the elements we need to compute the stats and is passed in
+    df %>% mutate(ncacm = acm-deaths) %>%
+         mutate(ifr = deaths/cases) %>%
+         mutate(odds = deaths/(cases-deaths)) %>%
+         mutate(odds_ratio=odds/lag(odds, n=8, default=0)) %>%
+         mutate(ifr8 =   ifr - lag(ifr, n=8, default=0)) %>%
+         mutate(odds8 = odds - lag(odds, n=8, default=0)) # change in odds
+
+
+wb=wb_workbook()
+wb$add_worksheet("steve")
+wb$add_data(x=df)
+wb$save(filename
+)
+wb$add_data(x=df) (to add in table format
+wb$remove_worksheet()
+
+wb$save("mtcars.xlsx")
