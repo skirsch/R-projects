@@ -60,6 +60,8 @@ main <- function(){
   df=read_in_CMS_files() %>% limit_records()
 
   df_list=df %>% analyze_records()
+
+  # all done. Take the list and save it
   df_list %>%  save_to_disk()   # returns the list of dataframe
   # return the full set of dataframes returned by analyze records including the
   # master
@@ -67,7 +69,12 @@ main <- function(){
 
 # get the comparison row from the df and return it. Others will need it
 load_key_row <- function(df){
-  df[key_row_num,]   # without the comma, returns col 1. Get a dataframe of 1 row
+  dfk=df[key_row_num,] %>%   # without the comma, returns col 1. Get a dataframe of 1 row
+  # now add computed columns IFR and Odds which makes other code easier
+  cases_ref=dfk$cases
+  death_ref=dfk$deaths
+  cbind(ifr=deaths_ref/cases_ref)
+  cbind(odds=deaths_ref/(cases_ref-deaths_ref))
 }
 
 # use this to limit records we are processing
@@ -87,13 +94,18 @@ analyze_records <- function(df){
   # make sure to do the get key row call after doing combine by week call and BEFORE calc stats
   # so make it a multi-line loop so can do this properly
 
+  # this creates the key_row_df which is then no longer available outside this function
+
   key_row_df=NULL
   df_list=list()      # no need to write out the master df because we have everything we need
   for (col_name in columns_of_interest){
+    # do one df at a time
     # always start with the original full dataframe when doing combine_by
-        df1 = df %>% combine_by(col_name)
-        if (is.null(key_row_df))            # if first time, extract key row after the combine
-          key_row_df=load_key_row(df1)
+    df1 = df %>% combine_by(col_name)
+    if (is.null(key_row_df)){            # if first time, extract key row after the combine
+          key_row_df=load_key_row(df1) %>%       # get the core fields need
+            compute_key_row_df_fields() # now compute IFR and odds fields before calc stats
+    }
     df1 %>% calc_stats(key_row_df)
     df_list[col_name]=df1
   }
@@ -150,6 +162,7 @@ calc_stats <- function (df, key_row_df){
   # add 4 new computed columns: ncacm, ifr, dead:alive odds, and derivatives
   # key_row_df has the elements we need to compute the stats and is passed in
   # be sure to order these so if newest columns need older columns, they are there
+
   ifr_ref = key_row_df$ifr
   odds_ref = key_row_df$odds
 
@@ -160,6 +173,7 @@ calc_stats <- function (df, key_row_df){
      mutate(rr =   ifr/ifr_ref) %>% # RR
      mutate(arr = ifr_ref-ifr) # ARR... note the reference is first
 }
+
 
 # plot multiple lines on a graph
 # Usage:
