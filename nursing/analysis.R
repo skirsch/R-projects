@@ -2,7 +2,6 @@
 
 # todo:
 # get "group by" working
-# set key_row_num back to 29
 # remove the limits on file size
 
 # get keyframe working
@@ -39,7 +38,7 @@ deaths1="Residents.Weekly.COVID.19.Deaths"
 acm1="Residents.Weekly.All.Deaths"
 provider_num1="Federal.Provider.Number"
 week1="Week.Ending"
-key_row_num = 1   # vax rollout is Dec 11 so this is week before that (12/6/2020) = row 29
+key_row_num = 29   # vax rollout is Dec 11 so this is week before that (12/6/2020) = row 29 for our reference
 
 # short names we use here
 cases="cases"
@@ -55,29 +54,27 @@ columns_of_interest=c(week, provider_num, provider_state)
 
 # settable parameters
 startyear=0   # 2020
-endyear=0     # 2023 is last file read in
+endyear=3    # 2023 is last file read in
 
 main <- function(){
   # read in CMS file with week added. week week num, provider, state, counts
   df=read_in_CMS_files() %>% limit_records()
 
-  df_list=df %>% analyze_records()
-  print(c("done analyzing records. dflist is", df_list))
+  dict=df %>% analyze_records()
 
   # all done. Take the list and save it
-  df_list %>%  save_to_disk()   # returns the list of dataframe
+  dict %>%  save_to_disk()   # returns the list of dataframe
   # return the full set of dataframes returned by analyze records including the
   # master
 }
 
 # get the comparison row from the df and return it. Others will need it
 get_key_row <- function(df){
-  print("loading key row")
   dfk=df[key_row_num,]    # without the comma, returns col 1. Get a dataframe of 1 row
   # now add computed columns IFR and Odds which makes other code easier
   cases_ref=dfk$cases  # grab cases
   deaths_ref=dfk$deaths # grab deaths
-  print(c(cases_ref, deaths_ref))
+  # add the two computed columns
   dfk %>% cbind(ifr=deaths_ref/cases_ref) %>%
   cbind(odds=deaths_ref/(cases_ref-deaths_ref))
 }
@@ -85,8 +82,7 @@ get_key_row <- function(df){
 # use this to limit records we are processing
 # including head, remove bad actors and selecting a concatentation of states
 limit_records <- function(df){
-  df %>%
-   head(520) #  %>%  limit number of records for debug
+  df # %>% head(520) #  %>%  limit number of records for debug
   # filter_out_bad_actors()  %>%
   # add filter on state here if wanted to limit everything below, e.g., calif
   #    filter_select(state, c('CA')
@@ -95,7 +91,7 @@ limit_records <- function(df){
 
 analyze_records <- function(df){
   # want to analyze by state, provider_num, week
-  # df_list=list(master=df)    # initialize the list df is the "master" df with all values
+  # dict=list(master=df)    # initialize the list df is the "master" df with all values
   # make sure to do the get key row call after doing combine by week call and BEFORE calc stats
   # so make it a multi-line loop so can do this properly
 
@@ -109,11 +105,9 @@ analyze_records <- function(df){
     df1 = df %>% combine_by(col_name)
     if (is.null(key_row_df)){            # if first time, extract key row after the combine
           key_row_df=get_key_row(df1)   # get the core fields needed and compute other columns
-          print(key_row_df)
     }
     df1=df1 %>% calc_stats(key_row_df)
     # now add this result to our list of dataframes
-    print(c("analyze records: now adding df", col_name,df1))
     dict[[col_name]]=df1     # dict has all our df's
   }
   return(dict)
@@ -193,16 +187,15 @@ plot_multi_line <- function(df, x_col, y_cols, mytitle="My graph", ytitle="Numbe
 }
 
 
-plot_results <- function(df_list){
+plot_results <- function(dict){
   # call plot_result several times for the plots desired
-  df_list  %>% # ignore first row since very odd
+  dict  %>% # ignore first row since very odd
     plot_multi_line('week', c('cases', 'deaths'), "Cases and deaths", "Count" )
   df   # return df
 }
 
 # https://cran.r-project.org/web/packages/openxlsx2/openxlsx2.pdf
 save_to_disk <- function (dict){
-  print("now saving dict to disk")
 
   # Create a new Excel workbook
   wb <- wb_workbook()
