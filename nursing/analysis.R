@@ -25,6 +25,7 @@ require(stats)
 library(lubridate)
 library(ggplot2)
 library(rlang)
+library(r2r)  # hash tables
 
 mydir="nursing/data/"
 file_prefix=paste0(mydir,"faclevel_202")
@@ -101,7 +102,7 @@ analyze_records <- function(df){
   # this creates the key_row_df which is then no longer available outside this function
 
   key_row_df=NULL
-  df_list=list()      # no need to write out the master df because we have everything we need
+  dict=hashmap() # like python
   for (col_name in columns_of_interest){
     # do one df at a time
     # always start with the original full dataframe when doing combine_by
@@ -113,9 +114,9 @@ analyze_records <- function(df){
     df1=df1 %>% calc_stats(key_row_df)
     # now add this result to our list of dataframes
     print(c("analyze records: now adding df", col_name,df1))
-    df_list[col_name]=df1     # df_list has list of dataframes named by the combine field
+    dict[[col_name]]=df1     # dict has all our df's
   }
-  return(df_list)
+  return(dict)
 }
 
 read_in_CMS_files <- function(){
@@ -200,10 +201,9 @@ plot_results <- function(df_list){
 }
 
 # https://cran.r-project.org/web/packages/openxlsx2/openxlsx2.pdf
-save_to_disk <- function (dataframe_list){
-  print("now saving dataframe_list to disk")
-  print(dataframe_list)
-  print("that was df list")
+save_to_disk <- function (dict){
+  print("now saving dict to disk")
+
   # Create a new Excel workbook
   wb <- wb_workbook()
 
@@ -211,13 +211,13 @@ save_to_disk <- function (dataframe_list){
   # if the dataframes in the list don't have a name, nothing will be written
   # so pass in list(sheet1=df1, mysheet2=df2)
   # if the dataframes list is empty, you'll get a warning about no worksheets
-  for (sheet_name in names(dataframe_list)) {
+  for (sheet_name in keys(dict)) {
     wb$add_worksheet(sheet_name)
-    wb$add_data(x=dataframe_list[[sheet_name]])
+    wb$add_data(x=dict[[sheet_name]])
   }
   # Save the workbook to the specified output file
   wb$save(output_file)
-  dataframe_list  # return the dataframe_list for others to process
+  dict # return the dataframe_list for others to process
 }
 
 # run

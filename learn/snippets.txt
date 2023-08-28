@@ -504,3 +504,21 @@ df$week will refer to column content... if one row, returns a sequence of values
   theme_minimal()
   print(myplot)
 
+
+# Install and load the r2r package
+# install.packages("r2r")
+library(r2r)
+
+# Create a hashmap
+
+my_hashmap[["foo"]]="barf"
+my_hashmap[["foo"]] to referernce it
+
+# Get a list of keys
+k <- keys(my_hashmap)
+
+# Print the list of keys
+print(keys)
+
+k[[1]] is the first key... you can iterate on this that is a named list
+
