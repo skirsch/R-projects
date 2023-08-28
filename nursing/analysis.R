@@ -1,10 +1,20 @@
 # analyze CMS Nursing Home data
 
 # todo:
-
+# rerun(state) will re-run it using the given state
+# and save to a special filename
 
 # write this up, survey, pfizer study on
 #
+
+# hashtable is called dict
+#   master: df of all the rows
+#   week: df derived
+#   state: df
+#   provider: df
+#   reference: dict we started with or null the first time
+
+# if passed existing hashtable, will use reference if exists or else generate it
 
 
 library(openxlsx2)   # write out xlsx; doesn't need java
@@ -29,13 +39,23 @@ provider_num1="Federal.Provider.Number"
 week1="Week.Ending"
 key_row_num = 29   # vax rollout is Dec 11 so this is week before that (12/6/2020) = row 29 for our reference
 
-# short names we use here
+# field names in the df tables
 cases="cases"
 deaths="deaths"
 week="week"
 provider_num="provider"
 provider_state="state"
 acm="acm"
+
+# define the key names in the dict
+master='master'   # name for master df with all the records
+# week is key containing the the df with the week records
+# provider_num ...
+# provider_state key containing the df for by state
+filter_condition='filter'
+reference='reference' # this has dict after the first pass analysis. Always the same so reuse as the current dict
+
+
 
 # columns to summarize on
 columns_of_interest=c(week, provider_num, provider_state)
@@ -44,16 +64,27 @@ columns_of_interest=c(week, provider_num, provider_state)
 # settable parameters
 startyear=0   # 2020
 endyear=3    # 2023 is last file read in
-master='master'   # name for master df
 
-main <- function(){
+# analyze is a dict containing 4 dataframes: master, state, provider, week
+# if re-run, we can start with this to establish metrics for filtering etc. off the base data
+analyzed='analyzed'
+
+main <- function(dict=NULL, state=NULL){
+  # we are coming in with either a null dict or it is preloaded
   # read in CMS file with week added. week week num, provider, state, counts
-  df=read_in_CMS_files()
-  dict=hashmap(list(master, df))  # start out with the key master=master db
-  dict %>% analyze_records() %>% data_cleanup() %>% analyze_records()  %>%  save_to_disk()
+  if (is.null(dict)){
+    df=read_in_CMS_files()
+    dict=hashmap(list(source, df))  # start out with the key master=master db which is never modified
+    dict= dict %>% analyze_records() # dict now has all the keys
+    dict[[reference]] = dict        # save a copy of the "reference dictionary" for subsequent passes
+  } else {
+    dict=dict[reference]  # replace dict with the reference
+  }
+  dict[filter_condition]=state
+  dict %>% data_cleanup() %>% analyze_records(state)  %>%  save_to_disk()
 
-  # return the full set of dataframes returned by analyze records including the
-  # master
+  # return the dict
+  dict
 }
 
 # get the comparison row from the df and return it. Others will need it
@@ -212,10 +243,12 @@ save_to_disk <- function (dict){
     wb$add_data(x=dict[[sheet_name]])
   }
   # Save the workbook to the specified output file
-  wb$save(output_file)
-  dict # return the dataframe_list for others to process
+  wb$save(paste0(output_file, dict[provider_state]))
+  dict # return the dict for others to process
 }
+
 
 # run
 dict=main()
+dict_ca=main(dict, state='CA')   # run for Calif only
 
