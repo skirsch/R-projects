@@ -2,6 +2,7 @@
 
 # todo:
 # get "group by" working
+# set key_row_num back to 29
 
 # get keyframe working
 # don't just limit to 2020'
@@ -36,7 +37,7 @@ deaths1="Residents.Weekly.COVID.19.Deaths"
 acm1="Residents.Weekly.All.Deaths"
 provider_num1="Federal.Provider.Number"
 week1="Week.Ending"
-key_row_num = 29   # vax rollout is Dec 11 so this is week before that (12/6/2020)
+key_row_num = 2   # vax rollout is Dec 11 so this is week before that (12/6/2020) = row 29
 
 # short names we use here
 cases="cases"
@@ -56,11 +57,10 @@ endyear=0     # 2023 is last file read in
 
 main <- function(){
   # read in CMS file with week added. week week num, provider, state, counts
-  df=read_in_CMS_files() %>%
-    limit_records()
-  df %>%
-    analyze_records() %>% # this returns a LIST of dataframes for saving
-    save_to_disk()   # returns the saved list
+  df=read_in_CMS_files() %>% limit_records()
+
+  df_list=df %>% analyze_records()
+  df_list %>%  save_to_disk()   # returns the list of dataframe
   # return the full set of dataframes returned by analyze records including the
   # master
 }
@@ -92,7 +92,7 @@ analyze_records <- function(df){
   for (col_name in columns_of_interest){
     # always start with the original full dataframe when doing combine_by
         df1 = df %>% combine_by(col_name)
-        if (is.null(key_row_df))            # key row is now present so save it out
+        if (is.null(key_row_df))            # if first time, extract key row after the combine
           key_row_df=load_key_row(df1)
     df1 %>% calc_stats(key_row_df)
     df_list[col_name]=df1
@@ -153,12 +153,12 @@ calc_stats <- function (df, key_row_df){
   ifr_ref = key_row_df$ifr
   odds_ref = key_row_df$odds
 
-      df %>% mutate(ncacm = acm-deaths) %>%
-         mutate(ifr = deaths/cases) %>%
-         mutate(odds = deaths/(cases-deaths)) %>%
-         mutate(odds_ratio=odds/odds_ref) %>% # OR
-         mutate(rr =   ifr/ifr_ref) %>% # RR
-         mutate(arr = ifr_ref-ifr) # ARR... note the reference is first
+  df %>% mutate(ncacm = acm-deaths) %>%
+     mutate(ifr = deaths/cases) %>%
+     mutate(odds = deaths/(cases-deaths)) %>%
+     mutate(odds_ratio=odds/odds_ref) %>% # OR
+     mutate(rr =   ifr/ifr_ref) %>% # RR
+     mutate(arr = ifr_ref-ifr) # ARR... note the reference is first
 }
 
 # plot multiple lines on a graph
@@ -166,22 +166,7 @@ calc_stats <- function (df, key_row_df){
 # plot_multi_line(df, x_col = "Time", y_cols = c("Y1", "Y2"))
 
 plot_multi_line <- function(df, x_col, y_cols, mytitle="My graph", ytitle="Number") {
-  myplot=ggplot(df, aes(x = .data[[x_col]]))+
-    scale_color_manual(values = c("blue", "red"))+      # ,"green","orange","magenta"))
-    # now we can add a line plot for each y_col sent in
-  for (i in seq(1,length(y_cols))){
-    myplot=myplot+geom_line(aes(y = .data[[y_cols[i]]], color = y_cols[i]), linewidth = 1)
-  }
-  myplot=myplot+
-        labs(title = mytitle,
-         x = x_col,
-         y = ytitle,
-         color = "Legend") +
-    # scale_x_continuous(breaks = seq(min(.data[[x_col]]), max(.data[[x_col]]), by = 1)) +
-    scale_x_continuous(n.breaks=10, minor_breaks=seq(1,30)) +
 
-  theme_minimal()
-  print(myplot)
   df
 }
 
@@ -195,7 +180,7 @@ plot_results <- function(df_list){
 
 # https://cran.r-project.org/web/packages/openxlsx2/openxlsx2.pdf
 save_to_disk <- function (dataframe_list){
-
+  print("now saving dfl to disk")
   # Create a new Excel workbook
   wb <- wb_workbook()
 
