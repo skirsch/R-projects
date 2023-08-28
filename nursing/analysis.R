@@ -3,6 +3,7 @@
 # todo:
 # get "group by" working
 # set key_row_num back to 29
+# remove the limits on file size
 
 # get keyframe working
 # don't just limit to 2020'
@@ -37,7 +38,7 @@ deaths1="Residents.Weekly.COVID.19.Deaths"
 acm1="Residents.Weekly.All.Deaths"
 provider_num1="Federal.Provider.Number"
 week1="Week.Ending"
-key_row_num = 2   # vax rollout is Dec 11 so this is week before that (12/6/2020) = row 29
+key_row_num = 1   # vax rollout is Dec 11 so this is week before that (12/6/2020) = row 29
 
 # short names we use here
 cases="cases"
@@ -60,6 +61,7 @@ main <- function(){
   df=read_in_CMS_files() %>% limit_records()
 
   df_list=df %>% analyze_records()
+  print(c("done analyzing records. dflist is", df_list))
 
   # all done. Take the list and save it
   df_list %>%  save_to_disk()   # returns the list of dataframe
@@ -68,12 +70,14 @@ main <- function(){
 }
 
 # get the comparison row from the df and return it. Others will need it
-load_key_row <- function(df){
-  dfk=df[key_row_num,] %>%   # without the comma, returns col 1. Get a dataframe of 1 row
+get_key_row <- function(df){
+  print("loading key row")
+  dfk=df[key_row_num,]    # without the comma, returns col 1. Get a dataframe of 1 row
   # now add computed columns IFR and Odds which makes other code easier
-  cases_ref=dfk$cases
-  death_ref=dfk$deaths
-  cbind(ifr=deaths_ref/cases_ref)
+  cases_ref=dfk$cases  # grab cases
+  deaths_ref=dfk$deaths # grab deaths
+  print(c(cases_ref, deaths_ref))
+  dfk %>% cbind(ifr=deaths_ref/cases_ref) %>%
   cbind(odds=deaths_ref/(cases_ref-deaths_ref))
 }
 
@@ -81,7 +85,7 @@ load_key_row <- function(df){
 # including head, remove bad actors and selecting a concatentation of states
 limit_records <- function(df){
   df %>%
-   head(45000) #  %>%  limit number of records for debug
+   head(520) #  %>%  limit number of records for debug
   # filter_out_bad_actors()  %>%
   # add filter on state here if wanted to limit everything below, e.g., calif
   #    filter_select(state, c('CA')
@@ -103,21 +107,24 @@ analyze_records <- function(df){
     # always start with the original full dataframe when doing combine_by
     df1 = df %>% combine_by(col_name)
     if (is.null(key_row_df)){            # if first time, extract key row after the combine
-          key_row_df=load_key_row(df1) %>%       # get the core fields need
-            compute_key_row_df_fields() # now compute IFR and odds fields before calc stats
+          key_row_df=get_key_row(df1)   # get the core fields needed and compute other columns
+          print(key_row_df)
     }
-    df1 %>% calc_stats(key_row_df)
-    df_list[col_name]=df1
+    df1=df1 %>% calc_stats(key_row_df)
+    # now add this result to our list of dataframes
+    print(c("analyze records: now adding df", col_name,df1))
+    df_list[col_name]=df1     # df_list has list of dataframes named by the combine field
   }
+  return(df_list)
 }
 
 read_in_CMS_files <- function(){
-  tbl=data.frame()
+  tbl=data.frame()   # create empty container
   for (i in seq(startyear,endyear,1)) {
     tbl1 <- read.csv(paste0(file_prefix, i, file_suffix))
     tbl1 = tbl1[,c(week1,provider_num1, provider_state1, cases1, deaths1, acm1)]
     # sort everything by date in column 1 which makes debugging a little easier
-    tbl1=tbl1[ order(tbl1[,1]),]
+    # tbl1=tbl1[ order(tbl1[,1]),]
     tbl=rbind(tbl,tbl1) #  append the new table entries
   }
   # set new column names for use in summarize inside of combine_weeks
@@ -194,7 +201,9 @@ plot_results <- function(df_list){
 
 # https://cran.r-project.org/web/packages/openxlsx2/openxlsx2.pdf
 save_to_disk <- function (dataframe_list){
-  print("now saving dfl to disk")
+  print("now saving dataframe_list to disk")
+  print(dataframe_list)
+  print("that was df list")
   # Create a new Excel workbook
   wb <- wb_workbook()
 

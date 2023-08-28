@@ -487,3 +487,20 @@ wb$save("mtcars.xlsx")
 
 df$week will refer to column content... if one row, returns a sequence of values (like c() does)
 
+  myplot=ggplot(df, aes(x = .data[[x_col]]))+
+    scale_color_manual(values = c("blue", "red"))+      # ,"green","orange","magenta"))
+    # now we can add a line plot for each y_col sent in
+  for (i in seq(1,length(y_cols))){
+    myplot=myplot+geom_line(aes(y = .data[[y_cols[i]]], color = y_cols[i]), linewidth = 1)
+  }
+  myplot=myplot+
+        labs(title = mytitle,
+         x = x_col,
+         y = ytitle,
+         color = "Legend") +
+    # scale_x_continuous(breaks = seq(min(.data[[x_col]]), max(.data[[x_col]]), by = 1)) +
+    scale_x_continuous(n.breaks=10, minor_breaks=seq(1,30)) +
+
+  theme_minimal()
+  print(myplot)
+
