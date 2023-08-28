@@ -571,3 +571,6 @@ NULL
 [1] 3 5
 
 so can hard code or use [[abc]]
+
+
+In most cases, when you want to perform an element-wise logical AND operation on vectors, you should use the & operator. If you need to evaluate multiple conditions sequentially and short-circuit the evaluation, you can use the && operator.

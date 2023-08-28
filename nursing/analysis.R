@@ -100,7 +100,8 @@ data_cleanup <- function(dict){
 # Define the filtering criteria for when a record will be removed
 filter_criteria <- function(df) {
   df %>%
-    filter(ifr > 1 | deaths > 150 | cases > 300 | cases ==0 )
+    filter(ifr > 1 | deaths > 150 | cases > 300 | cases ==0 |
+             (cases>100 && deaths==0) )
 }
 
 analyze_records <- function(dict){
