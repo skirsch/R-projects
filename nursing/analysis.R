@@ -49,7 +49,7 @@ master='master'   # name for master df
 main <- function(){
   # read in CMS file with week added. week week num, provider, state, counts
   df=read_in_CMS_files()
-  dict=hashmap(master, df)  # start out with the master db
+  dict=hashmap(list(master, df))  # start out with the key master=master db
   dict %>% analyze_records() %>% data_cleanup() %>% analyze_records()  %>%  save_to_disk()
 
   # return the full set of dataframes returned by analyze records including the
@@ -103,14 +103,6 @@ filter_criteria <- function(df) {
     filter(ifr > 1 | deaths > 150 | cases > 300 | cases ==0 )
 }
 
-
-  df
-
-
-
-}
-
-
 analyze_records <- function(dict){
   # takes the original dataframe
   # want to analyze by state, provider_num, week
@@ -119,7 +111,7 @@ analyze_records <- function(dict){
   # so make it a multi-line loop so can do this properly
 
   # this creates the key_row_df which is then no longer available outside this function
-
+  df=dict[[master]]
   key_row_df=NULL
   for (col_name in columns_of_interest){
     # do one df at a time
@@ -128,9 +120,8 @@ analyze_records <- function(dict){
     if (is.null(key_row_df)){            # if first time, extract key row after the combine
           key_row_df=get_key_row(df1)   # get the core fields needed and compute other columns
     }
-    df1=df1 %>% calc_stats(key_row_df)
+    dict[[col_name]]=df1 %>% calc_stats(key_row_df)
     # now add this result to our list of dataframes
-    dict[[col_name]]=df1     # dict has all our df's
   }
   return(dict)
 }
@@ -225,5 +216,5 @@ save_to_disk <- function (dict){
 }
 
 # run
-dfl=main()
+dict=main()
 
