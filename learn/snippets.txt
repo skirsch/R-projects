@@ -479,3 +479,11 @@ wb$add_data(x=df) (to add in table format
 wb$remove_worksheet()
 
 wb$save("mtcars.xlsx")
+
+
+         mutate(odds_ratio=odds/lag(odds, n=8, default=0)) %>%
+         mutate(ifr8 =   ifr - lag(ifr, n=8, default=0)) %>%
+         mutate(odds8 = odds - lag(odds, n=8, default=0)) # change in odds
+
+df$week will refer to column content... if one row, returns a sequence of values (like c() does)
+

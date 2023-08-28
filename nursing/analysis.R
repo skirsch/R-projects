@@ -3,8 +3,9 @@
 # todo:
 # get "group by" working
 
-# get keyframe working f
-# look for anomaly when group by provider
+# get keyframe working
+# don't just limit to 2020'
+# look for anomaly when group by provider and
 # see if state data is consistent
 # compute OR, RRR, ARR relative to the keyframe
 
@@ -57,9 +58,8 @@ main <- function(){
   # read in CMS file with week added. week week num, provider, state, counts
   df=read_in_CMS_files() %>%
     limit_records()
-  key_row_df=load_key_row(df)
   df %>%
-    analyze_records(key_row_df) %>% # this returns a LIST of dataframes for saving
+    analyze_records() %>% # this returns a LIST of dataframes for saving
     save_to_disk()   # returns the saved list
   # return the full set of dataframes returned by analyze records including the
   # master
@@ -81,12 +81,22 @@ limit_records <- function(df){
 }
 
 
-analyze_records <- function(df,key_row_df){
+analyze_records <- function(df){
   # want to analyze by state, provider_num, week
   # df_list=list(master=df)    # initialize the list df is the "master" df with all values
+  # make sure to do the get key row call after doing combine by week call and BEFORE calc stats
+  # so make it a multi-line loop so can do this properly
+
+  key_row_df=NULL
   df_list=list()      # no need to write out the master df because we have everything we need
-  for (col_name in columns_of_interest)
-    df_list[col_name] = df %>% combine_by(col_name) %>% calc_stats(key_row_df)
+  for (col_name in columns_of_interest){
+    # always start with the original full dataframe when doing combine_by
+        df1 = df %>% combine_by(col_name)
+        if (is.null(key_row_df))            # key row is now present so save it out
+          key_row_df=load_key_row(df1)
+    df1 %>% calc_stats(key_row_df)
+    df_list[col_name]=df1
+  }
 }
 
 read_in_CMS_files <- function(){
@@ -139,12 +149,16 @@ calc_stats <- function (df, key_row_df){
   # input has week, cases, deaths columns
   # add 4 new computed columns: ncacm, ifr, dead:alive odds, and derivatives
   # key_row_df has the elements we need to compute the stats and is passed in
-    df %>% mutate(ncacm = acm-deaths) %>%
+  # be sure to order these so if newest columns need older columns, they are there
+  ifr_ref = key_row_df$ifr
+  odds_ref = key_row_df$odds
+
+      df %>% mutate(ncacm = acm-deaths) %>%
          mutate(ifr = deaths/cases) %>%
          mutate(odds = deaths/(cases-deaths)) %>%
-         mutate(odds_ratio=odds/lag(odds, n=8, default=0)) %>%
-         mutate(ifr8 =   ifr - lag(ifr, n=8, default=0)) %>%
-         mutate(odds8 = odds - lag(odds, n=8, default=0)) # change in odds
+         mutate(odds_ratio=odds/odds_ref) %>% # OR
+         mutate(rr =   ifr/ifr_ref) %>% # RR
+         mutate(arr = ifr_ref-ifr) # ARR... note the reference is first
 }
 
 # plot multiple lines on a graph
@@ -188,8 +202,8 @@ save_to_disk <- function (dataframe_list){
   # Loop over the list and add each dataframe to a separate worksheet
   # if the dataframes in the list don't have a name, nothing will be written
   # so pass in list(sheet1=df1, mysheet2=df2)
+  # if the dataframes list is empty, you'll get a warning about no worksheets
   for (sheet_name in names(dataframe_list)) {
-    print(sheet_name)
     wb$add_worksheet(sheet_name)
     wb$add_data(x=dataframe_list[[sheet_name]])
   }
