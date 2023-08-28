@@ -505,6 +505,8 @@ df$week will refer to column content... if one row, returns a sequence of values
   print(myplot)
 
 
+https://cran.r-project.org/web/packages/r2r/vignettes/r2r.html
+
 # Install and load the r2r package
 # install.packages("r2r")
 library(r2r)
@@ -519,6 +521,53 @@ k <- keys(my_hashmap)
 
 # Print the list of keys
 print(keys)
+delete(hashmap, "a")
+
+length(m) is number of keys
+
 
 k[[1]] is the first key... you can iterate on this that is a named list
 
+  for (sheet_name in names(dataframe_list)) {
+
+
+
+
+
+  # %>% head(520) #  %>%  limit number of records for debug
+  # filter_out_bad_actors()  %>%
+  # add filter on state here if wanted to limit everything below, e.g., calif
+  #    filter_select(state, c('CA')
+
+
+  # %>% head(520) #  %>%  limit number of records for debug
+  # filter_out_bad_actors()  %>%
+  # add filter on state here if wanted to limit everything below, e.g., calif
+  #    filter_select(state, c('CA')
+
+
+provider_nums_to_remove= c(102, 104)  # concatenation of providers to remove
+filter_out_bad_actors <- function(df){
+  df # nothing to filter so far. use below line if find a bogus provider
+  # filter out records at start based on provider number
+    # df %>% filter(!provider_num %in% provider_nums_to_remove)
+}
+
+# remove facilities with bogus counts (if we can find any)
+
+# only keep the records of a df where the col, value is a match, e.g.,
+# provider_state, seq("CA", "OR")
+filter_select <- function(df, col, val){
+  df %>% filter(col %in% val)
+}
+
+
+ table2$ProviderNumber
+[1] 3 5
+> xx="ProviderNumber"
+> table2$xx
+NULL
+> table2[[xx]]
+[1] 3 5
+
+so can hard code or use [[abc]]

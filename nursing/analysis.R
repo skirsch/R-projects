@@ -1,22 +1,11 @@
 # analyze CMS Nursing Home data
 
 # todo:
-# get "group by" working
-# remove the limits on file size
 
-# get keyframe working
-# don't just limit to 2020'
-# look for anomaly when group by provider and
-# see if state data is consistent
-# compute OR, RRR, ARR relative to the keyframe
 
 # write this up, survey, pfizer study on
 #
-# summarize data on a per facility basis so can weed out those with 0 IFR and high IFR
-# write out the two tables as Excel sheets
-# plot of the IFR and odds ratio and
 
-# locate bogus provider by grouping on the provider instead of the date
 
 library(openxlsx2)   # write out xlsx; doesn't need java
 library(dplyr) # need for pipe operation to work
@@ -55,15 +44,14 @@ columns_of_interest=c(week, provider_num, provider_state)
 # settable parameters
 startyear=0   # 2020
 endyear=3    # 2023 is last file read in
+master='master'   # name for master df
 
 main <- function(){
   # read in CMS file with week added. week week num, provider, state, counts
-  df=read_in_CMS_files() %>% limit_records()
+  df=read_in_CMS_files()
+  dict=hashmap(master, df)  # start out with the master db
+  dict %>% analyze_records() %>% data_cleanup() %>% analyze_records()  %>%  save_to_disk()
 
-  dict=df %>% analyze_records()
-
-  # all done. Take the list and save it
-  dict %>%  save_to_disk()   # returns the list of dataframe
   # return the full set of dataframes returned by analyze records including the
   # master
 }
@@ -81,15 +69,50 @@ get_key_row <- function(df){
 
 # use this to limit records we are processing
 # including head, remove bad actors and selecting a concatentation of states
-limit_records <- function(df){
-  df # %>% head(520) #  %>%  limit number of records for debug
-  # filter_out_bad_actors()  %>%
-  # add filter on state here if wanted to limit everything below, e.g., calif
-  #    filter_select(state, c('CA')
+data_cleanup <- function(dict){
+  # table1=analysis by provider; table2 is the master table
+  # run the analysis to do the crosstabs
+  # remove the offending entries
+  # then re-run the data processing again
+  # then output to sheet.
+  # so no data cleanup on first run
+
+  # criteria for provider removal
+  # IFR >1
+  # cases =0 or > 300
+  # deaths range >150
+
+  table1=dict[[provider_num]]
+  table2=dict[[master]]
+
+  # Apply the filtering criteria to the first table
+  filtered_table1 <- filter_criteria(table1)
+
+  # Get a list of ProviderNumbers meeting the criteria
+  selected_provider_numbers <- filtered_table1$provider
+
+  # Delete records from table2 where ProviderNumber matches
+  table2 <- table2[!(table2$provider %in% selected_provider_numbers), ]
+  dict[[master]]=table2       # update the new master
+  dict   # return the dictionary
+  }
+
+# Define the filtering criteria for when a record will be removed
+filter_criteria <- function(df) {
+  df %>%
+    filter(ifr > 1 | deaths > 150 | cases > 300 | cases ==0 )
 }
 
 
-analyze_records <- function(df){
+  df
+
+
+
+}
+
+
+analyze_records <- function(dict){
+  # takes the original dataframe
   # want to analyze by state, provider_num, week
   # dict=list(master=df)    # initialize the list df is the "master" df with all values
   # make sure to do the get key row call after doing combine by week call and BEFORE calc stats
@@ -98,7 +121,6 @@ analyze_records <- function(df){
   # this creates the key_row_df which is then no longer available outside this function
 
   key_row_df=NULL
-  dict=hashmap() # like python
   for (col_name in columns_of_interest){
     # do one df at a time
     # always start with the original full dataframe when doing combine_by
@@ -144,19 +166,7 @@ combine_by <- function (df, col_name=week) {
             )
 }
 
-# remove facilities with bogus counts (if we can find any)
-provider_nums_to_remove= c(102, 104)  # concatenation of providers to remove
-filter_out_bad_actors <- function(df){
-  df # nothing to filter so far. use below line if find a bogus provider
-  # filter out records at start based on provider number
-    # df %>% filter(!provider_num %in% provider_nums_to_remove)
-}
 
-# only keep the records of a df where the col, value is a match, e.g.,
-# provider_state, seq("CA", "OR")
-filter_select <- function(df, col, val){
-  df %>% filter(col %in% val)
-}
 
 # add new computed columns (so long as computed from values in same row it's easy)
 calc_stats <- function (df, key_row_df){
@@ -205,6 +215,7 @@ save_to_disk <- function (dict){
   # so pass in list(sheet1=df1, mysheet2=df2)
   # if the dataframes list is empty, you'll get a warning about no worksheets
   for (sheet_name in keys(dict)) {
+    if (sheet_name==master) next  # don't write out master spreadsheet
     wb$add_worksheet(sheet_name)
     wb$add_data(x=dict[[sheet_name]])
   }
