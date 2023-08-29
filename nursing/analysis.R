@@ -1,7 +1,6 @@
 # analyze CMS Nursing Home data
 
-# issues: not extracting calif
-# calling save_to_disk at start?!?
+# remove the _ in filename. Comment out the print.
 
 # todo:
 # rerun(state) will re-run it using the given state
@@ -84,7 +83,6 @@ main <- function(dict=NULL, state_name=NULL){
     dict= dict %>% analyze_records() # dict now has all the keys added to it
 
     # save a copy of the "reference dictionary" for subsequent passes
-    dict[[reference]] = dict
   } else {
     dict=dict[[reference]]  # grab the existing pre-computed dictionary
   }
@@ -92,6 +90,11 @@ main <- function(dict=NULL, state_name=NULL){
   # at this point we are on our second pass through the records
   # state if not null, means only for that state
   dict %>% data_cleanup() %>% analyze_records()  %>%  save_to_disk()
+
+  # if this is the first time, we run (no saved reference), save the final results of the
+  # first analysis for inputs on subsequent runs
+  if (is.null(dict[[reference]]))
+      dict[[reference]] = dict
 
   # return the dict
   dict
@@ -128,7 +131,8 @@ data_cleanup <- function(dict){
   table2=dict[[master]]
 
   state_name=dict[[filter_condition]]
-  # Apply the filtering criteria to the first table
+  # Apply the filtering criteria to the provider table to get the provider IDs to remove
+  # from the database
   filtered_table1 <- filter_criteria(table1, state_name)
 
   # Get a list of ProviderNumbers meeting the criteria
@@ -143,23 +147,32 @@ data_cleanup <- function(dict){
 # Define the filtering criteria for when a record will be removed
 # called by data_cleanup
 # this receives a df created by analysis  NOT the dict
-# the df passed in is always the PROVIDER dataframe with 10 columns
+# the df passed in is always the PROVIDER dataframe with 11 columns
+#
 # the references here are the hard coded column names in this dataframe
 # This function is used ONLY to determine the provider numbers
 # which should be removed based on the overall stats for that provider.
 # we need to add state as a column in the provider df here for this to work properly
+
+# this function gets calle ONCE each time you call main
+# if this is re-run, the database you are starting with has already had the bad QA
+# records already tossed. So if you try to run the removal criteria again, you'll get 0 records
+# for the second criteria. So solution is to use the initial criteria if state isn't specified,
+# and use the other criteria when it is
 filter_criteria <- function(df, state_name) {
-  df=df %>%
-    # filter will remove the matching records
-    filter(ifr > 1 | deaths > 150 | cases > 300 | cases ==0 |
+  if (is.null(state_name))
+    # filter will return the records that match the criteria
+    # then we will take these records (which are "bad") and remove them
+    # based on their provider ID
+    df %>% filter(ifr > 1 | deaths > 150 | cases > 300 | cases ==0 |
              (cases>100 & deaths==0) )
 
-  # remove records which do NOT match the state name
-  if (!(is.null(state_name)))
+  else
+    # select the recrods which do NOT match the state name so they can be removed
+    # so this will be a big list of all states we don't want
+    # we basically just want to leave calif
     # note that state will be interpreted as a literal field name to match the column
-    df= df %>% filter(state != state_name)
-
-  return(df)
+    df %>% filter(state != state_name)
 }
 
 analyze_records <- function(dict){
@@ -293,8 +306,13 @@ save_to_disk <- function (dict){
     wb$add_data(x=dict[[sheet_name]])
   }
   # Save the workbook to the specified output file
-  file_suffix=dict[[filter_condition]]
-  output_filename=sub("\\.", paste0("_", file_suffix,"."),output_file)
+  file_suffix=dict[[filter_condition]]  # get the state
+  if (is.null(file_suffix))
+    # it's the first run so save as specified name
+    output_filename=output_file
+  else
+    # append _CA if calif
+    output_filename=sub("\\.", paste0("_", file_suffix,"."),output_file)
   wb$save(output_filename)
   dict # return the dict for others to process
 }
@@ -303,5 +321,9 @@ save_to_disk <- function (dict){
 # run
 dict=main()
 print("now call for calif only")
-dict_ca=main(dict, state='CA')   # re-run for Calif only
+
+# create keys for the dict for each state
+for (s in c('CA', 'TX',  'FL', 'NY','PA'))
+  dict[[s]]=main(dict, state=s)   # run for top 5 states
+
 
