@@ -28,7 +28,7 @@ library(ggplot2)
 library(rlang)
 library(r2r)  # hash tables
 
-DEBUG=FALSE
+DEBUG=TRUE
 
 mydir="nursing/data/"
 file_prefix=paste0(mydir,"faclevel_202")
@@ -242,15 +242,16 @@ combine_by <- function (df, col_name=week) {
 
   # returns the dataframe
   if (col_name == provider_num )
+    # for generating the provider tab, include the state of the provider in the output
     df %>% group_by(!!field_symbol) %>%
-    summarise(cases = sum(cases,na.rm=TRUE),
+       reframe(cases = sum(cases,na.rm=TRUE),
             deaths = sum(deaths, na.rm=TRUE),
             acm = sum(acm, na.rm=TRUE),
             state=head(state,1)  # we can take any item since they are the same so take the first.
             )
     else
     df %>% group_by(!!field_symbol) %>%
-    summarise(cases = sum(cases,na.rm=TRUE),
+       reframe(cases = sum(cases,na.rm=TRUE),
             deaths = sum(deaths, na.rm=TRUE),
             acm = sum(acm, na.rm=TRUE)
             )
@@ -325,10 +326,14 @@ save_to_disk <- function (dict){
 
 # run
 dict=main()
-if (DEBUG) print("now call for calif only")
 
 # create keys for the dict for each state
-for (s in c('CA', 'TX',  'FL', 'NY','PA'))
+for (s in c('CA', 'TX',  'FL', 'NY','PA')){
+  if (DEBUG)
+    print(paste0("Now computing for state:",s))
   dict[[s]]=main(dict, state=s)   # run for top 5 states
+
+
+}
 
 
