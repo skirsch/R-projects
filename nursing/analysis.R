@@ -7,20 +7,26 @@
 # and save to a special filename
 
 
-# write this up,  pfizer study on preg with retsef levy
-#
 
-# hashtable is called dict
-#   master: df of all the rows
-#   week: df derived
-#   state: df
-#   provider: df
-#   reference: dict we started with or null the first time
+# Data structure
 
-# if passed existing hashtable, will use reference if exists or else generate it
+# root is a hashtable with keys = states
+#    ALL
+#    CA
+#    TX
+#    ...
 
+# Each state has a hash table with keys:
+#   input: df of all the rows and the key columns
+#   week: derived from the input
+#   state: dervied
+#   provider: derived
+#   parent: pointer to parent (the root)
+
+# the functions all pass the state dict being operated on to each other
 
 library(openxlsx2)   # write out xlsx; doesn't need java
+library(xlsx)
 library(dplyr) # need for pipe operation to work
 require(stats)
 library(lubridate)
@@ -84,7 +90,11 @@ main <- function(dict=NULL, state_name=NULL){
     dict=hashmap(list(master, df))  # start out with the key master=master db which is never modified
     dict= dict %>% analyze_records() # dict now has all the keys added to it
 
-    # save a copy of the "reference dictionary" for subsequent passes
+    # the lowest level dict has no reference key
+    # the state dicts have a reference slot point
+    # circular reference a bad idea
+    dict[[reference]] = dict
+
   } else {
     dict=dict[[reference]]  # grab the existing pre-computed dictionary
   }
@@ -224,6 +234,7 @@ read_in_CMS_files <- function(){
 # this is called by analyze records 3 times; once for each of the 3 derived
 # dataframes of interest as listed here:
 # columns_of_interest=c(week, provider_num, provider_state)
+# so col_name is key on each... df will be the same input (master db)
 combine_by <- function (df, col_name=week) {
   if (DEBUG) print(c("entering combine_by with col_name", col_name))
   # group_by wants a static column name rather than a variable
@@ -239,22 +250,28 @@ combine_by <- function (df, col_name=week) {
 
   # if we are summarizing by provider num, it makes sense to add state
   # to the output
-
+  # used to be summarize, but they said use reframe
   # returns the dataframe
+
+  # Note that group_by just does a calculation... you can't visably see
+  # any modification to the data itself. So you have to use
+  # reframe to see the results.
+
   if (col_name == provider_num )
     # for generating the provider tab, include the state of the provider in the output
-    df %>% group_by(!!field_symbol) %>%
+    df=df %>% group_by(!!field_symbol) %>%
        reframe(cases = sum(cases,na.rm=TRUE),
             deaths = sum(deaths, na.rm=TRUE),
             acm = sum(acm, na.rm=TRUE),
             state=head(state,1)  # we can take any item since they are the same so take the first.
             )
     else
-    df %>% group_by(!!field_symbol) %>%
+    df=df %>% group_by(!!field_symbol) %>%
        reframe(cases = sum(cases,na.rm=TRUE),
             deaths = sum(deaths, na.rm=TRUE),
             acm = sum(acm, na.rm=TRUE)
             )
+    return(df)   # return the derived sheet (either weeks, provider, state)
 }
 
 # add new computed columns (so long as computed from values in same row it's easy)
@@ -294,10 +311,21 @@ plot_results <- function(dict){
   df   # return df
 }
 
-# https://cran.r-project.org/web/packages/openxlsx2/openxlsx2.pdf
+
+# http://www.sthda.com/english/wiki/writing-data-from-r-to-excel-files-xls-xlsx
 save_to_disk <- function (dict){
   if (DEBUG) print("entering save to disk")
-  # Create a new Excel workbook
+
+  # will give error if sheet name already exists
+  for (sheet_name in columns_of_interest){
+    sheet_unique=paste0(sheet_name, dict[[filter_condition]])
+    write.xlsx(dict[[sheet_name]], output_file, sheetName = sheet_unique,
+    col.names = TRUE, row.names = FALSE, append = TRUE)
+  }
+}
+
+# https://cran.r-project.org/web/packages/openxlsx2/openxlsx2.pdf
+old_save_to_disk = function(dict){
   wb <- wb_workbook()
 
   # Loop over the list and add each dataframe to a separate worksheet
@@ -328,12 +356,12 @@ save_to_disk <- function (dict){
 dict=main()
 
 # create keys for the dict for each state
-for (s in c('CA', 'TX',  'FL', 'NY','PA')){
+# TX creates stoi error when write out workbook
+for (s in c('CA', 'TX', 'FL', 'NY','PA')){
   if (DEBUG)
     print(paste0("Now computing for state:",s))
   dict[[s]]=main(dict, state=s)   # run for top 5 states
 
 
 }
-
 
