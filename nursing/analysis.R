@@ -48,16 +48,18 @@ provider_state="state"
 acm="acm"
 
 # define the key names in the dict
-master='master'   # name for master df with all the records
-# week is key containing the the df with the week records
+master='master'   # holds the master df with all the records
+# week is key holding the df with the week records
 # provider_num ...
 # provider_state key containing the df for by state
-filter_condition='filter'
-reference='reference' # this has dict after the first pass analysis. Always the same so reuse as the current dict
+filter_condition='filter'  # this key contains the state to generate results for. NULL means all states
 
-
+# this stores the dict state after the first pass analysis. Always the same so
+# reuse each iteration as starting point
+reference='reference'
 
 # columns to summarize on
+# these are the sheet names to create at the end
 columns_of_interest=c(week, provider_num, provider_state)
 
 
@@ -69,19 +71,21 @@ endyear=3    # 2023 is last file read in
 # if re-run, we can start with this to establish metrics for filtering etc. off the base data
 analyzed='analyzed'
 
-main <- function(dict=NULL, state=NULL){
+main <- function(dict=NULL, state_name=NULL){
   # we are coming in with either a null dict or it is preloaded
   # read in CMS file with week added. week week num, provider, state, counts
   if (is.null(dict)){
     df=read_in_CMS_files()
-    dict=hashmap(list(source, df))  # start out with the key master=master db which is never modified
+    dict=hashmap(list(master, df))  # start out with the key master=master db which is never modified
     dict= dict %>% analyze_records() # dict now has all the keys
     dict[[reference]] = dict        # save a copy of the "reference dictionary" for subsequent passes
   } else {
-    dict=dict[reference]  # replace dict with the reference
+    dict=dict[reference]  # replace dict with the reference gold standard so we wind back the clock
   }
-  dict[filter_condition]=state
-  dict %>% data_cleanup() %>% analyze_records(state)  %>%  save_to_disk()
+  dict[[filter_condition]]=state_name  # if not null, will only generate for that state, e.g., "CA"
+  # at this point we are on our second pass through the records
+  # state if not null, means only for that state
+  dict %>% data_cleanup() %>% analyze_records()  %>%  save_to_disk()
 
   # return the dict
   dict
@@ -113,11 +117,14 @@ data_cleanup <- function(dict){
   # cases =0 or > 300
   # deaths range >150
 
+
+
   table1=dict[[provider_num]]
   table2=dict[[master]]
 
+  state_name=dict[[filter_condition]]
   # Apply the filtering criteria to the first table
-  filtered_table1 <- filter_criteria(table1)
+  filtered_table1 <- filter_criteria(table1, state_name)
 
   # Get a list of ProviderNumbers meeting the criteria
   selected_provider_numbers <- filtered_table1$provider
@@ -129,10 +136,20 @@ data_cleanup <- function(dict){
   }
 
 # Define the filtering criteria for when a record will be removed
-filter_criteria <- function(df) {
-  df %>%
+# called by data_cleanup
+# this receives a df  NOT the dict
+# the df passed in is always the MASTER df with all the records
+filter_criteria <- function(df, state_name) {
+  df=df %>%
+    # filter will remove the matching records
     filter(ifr > 1 | deaths > 150 | cases > 300 | cases ==0 |
              (cases>100 & deaths==0) )
+
+  # remove records which do NOT match the state name
+  if (!is.null(state_name))
+    df= df %>% filter(provider_state != state_name)
+
+  return(df)
 }
 
 analyze_records <- function(dict){
@@ -141,10 +158,10 @@ analyze_records <- function(dict){
   # dict=list(master=df)    # initialize the list df is the "master" df with all values
   # make sure to do the get key row call after doing combine by week call and BEFORE calc stats
   # so make it a multi-line loop so can do this properly
-
+  print("start of analyze records")
   # this creates the key_row_df which is then no longer available outside this function
-  df=dict[[master]]
-  key_row_df=NULL
+  df=dict[[master]]  # get the df containing the FULL database
+  key_row_df=NULL    # this will be set to values in the comparison row for OR calc
   for (col_name in columns_of_interest){
     # do one df at a time
     # always start with the original full dataframe when doing combine_by
@@ -175,6 +192,7 @@ read_in_CMS_files <- function(){
 # combine cases and deaths with the same week into one row for each week
 # one row per week (instead of 15,000 rows)
 combine_by <- function (df, col_name=week) {
+  print(c("entering combine_by with col_name", col_name))
   # group_by wants a static column name rather than a variable
   field_symbol <- sym(col_name)
 
@@ -237,18 +255,23 @@ save_to_disk <- function (dict){
   # if the dataframes in the list don't have a name, nothing will be written
   # so pass in list(sheet1=df1, mysheet2=df2)
   # if the dataframes list is empty, you'll get a warning about no worksheets
-  for (sheet_name in keys(dict)) {
-    if (sheet_name==master) next  # don't write out master spreadsheet
+
+  for (sheet_name in columns_of_interest) {
+    # create empty sheet with given name
     wb$add_worksheet(sheet_name)
+    # now add the dataframe to that sheet
     wb$add_data(x=dict[[sheet_name]])
   }
   # Save the workbook to the specified output file
-  wb$save(paste0(output_file, dict[provider_state]))
+  file_suffix=dict[[filter_condition]]
+  output_filename=sub("\\.", paste0("_", file_suffix,"."),output_file)
+  wb$save(paste0(output_file, ))
   dict # return the dict for others to process
 }
 
 
 # run
 dict=main()
-dict_ca=main(dict, state='CA')   # run for Calif only
+print("now call for calif only")
+dict_ca=main(dict, state='CA')   # re-run for Calif only
 

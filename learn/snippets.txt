@@ -511,7 +511,7 @@ https://cran.r-project.org/web/packages/r2r/vignettes/r2r.html
 # install.packages("r2r")
 library(r2r)
 
-# Create a hashmap
+# Create a hashmap: always use [[ ]] !!
 
 my_hashmap[["foo"]]="barf"
 my_hashmap[["foo"]] to referernce it
@@ -574,3 +574,12 @@ so can hard code or use [[abc]]
 
 
 In most cases, when you want to perform an element-wise logical AND operation on vectors, you should use the & operator. If you need to evaluate multiple conditions sequentially and short-circuit the evaluation, you can use the && operator.
+
+string substitute from first x to an a
+for looking for ., must quote it since first is a regular expression
+> sub("x","a","xxxaxxx")
+[1] "axxaxxx"
+>
+
+terminate iteration of for loop
+    if (sheet_name==master) next  # don't write out master spreadsheet
