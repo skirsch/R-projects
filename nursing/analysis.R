@@ -10,7 +10,9 @@
 
 # Data structure
 
-# root is a hashtable with keys = states
+# root is a hashtable with keys = states_to_process
+# root is a global so easy to access from all functions
+# root has the following keys:
 #    ALL
 #    CA
 #    TX
@@ -19,14 +21,14 @@
 # Each state has a hash table with keys:
 #   input: df of all the rows and the key columns
 #   week: derived from the input
-#   state: dervied
+#   state: derivied
 #   provider: derived
-#   parent: pointer to parent (the root)
+#   name: name of the state
 
-# the functions all pass the state dict being operated on to each other
+# most functions will pipe the state hash table between the function calls
 
 library(openxlsx2)   # write out xlsx; doesn't need java
-library(xlsx)
+library(xlsx)  # this one works without stoi exception
 library(dplyr) # need for pipe operation to work
 require(stats)
 library(lubridate)
@@ -39,7 +41,7 @@ DEBUG=TRUE
 mydir="nursing/data/"
 file_prefix=paste0(mydir,"faclevel_202")
 file_suffix=".csv"
-output_file=paste0(mydir,"nursing.xlsx")
+output_filename_prefix=paste0(mydir,"nursing_")
 
 # original field names
 provider_state1="Provider.State"
@@ -48,7 +50,10 @@ deaths1="Residents.Weekly.COVID.19.Deaths"
 acm1="Residents.Weekly.All.Deaths"
 provider_num1="Federal.Provider.Number"
 week1="Week.Ending"
+beds1="Number.of.All.Beds"
 key_row_num = 29   # vax rollout is Dec 11 so this is week before that (12/6/2020) = row 29 for our reference
+
+all_columns_to_extract=c(week1,provider_num1, provider_state1, cases1, deaths1, acm1, beds1)
 
 # field names in the df tables
 cases="cases"
@@ -218,14 +223,14 @@ read_in_CMS_files <- function(){
   tbl=data.frame()   # create empty container
   for (i in seq(startyear,endyear,1)) {
     tbl1 <- read.csv(paste0(file_prefix, i, file_suffix))
-    # now just interested in 6 columns in the original .csv file
-    tbl1 = tbl1[,c(week1,provider_num1, provider_state1, cases1, deaths1, acm1)]
+    # just interested in key columns in the original .csv file
+    tbl1 = tbl1[, all_columns_to_extract]
     # sort everything by date in column 1 which makes debugging a little easier
     # tbl1=tbl1[ order(tbl1[,1]),]
     tbl=rbind(tbl,tbl1) #  append the new table entries to the bottom
   }
   # set new column names for use in summarize inside of combine_weeks
-  colnames(tbl)=c(week, provider_num, provider_state, cases, deaths, acm)
+  colnames(tbl)=c(week, provider_num, provider_state, cases, deaths, acm, beds)
   tbl %>% mutate_at(vars(week), mdy)  # set date type for the date
 }
 
@@ -317,6 +322,8 @@ save_to_disk <- function (dict){
   if (DEBUG) print("entering save to disk")
 
   # will give error if sheet name already exists
+  filename=paste0(output_filename_prefix,state,".xlsx")
+
   for (sheet_name in columns_of_interest){
     sheet_unique=paste0(sheet_name, dict[[filter_condition]])
     write.xlsx(dict[[sheet_name]], output_file, sheetName = sheet_unique,
