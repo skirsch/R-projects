@@ -28,6 +28,8 @@ library(ggplot2)
 library(rlang)
 library(r2r)  # hash tables
 
+DEBUG=FALSE
+
 mydir="nursing/data/"
 file_prefix=paste0(mydir,"faclevel_202")
 file_suffix=".csv"
@@ -126,7 +128,7 @@ data_cleanup <- function(dict){
   # cases =0 or > 300
   # deaths range >150
 
-  print("Entering data_cleanup")
+  if (DEBUG) print("Entering data_cleanup")
   table1=dict[[provider_num]]
   table2=dict[[master]]
 
@@ -182,10 +184,13 @@ analyze_records <- function(dict){
   # dict=list(master=df)    # initialize the list df is the "master" df with all values
   # make sure to do the get key row call after doing combine by week call and BEFORE calc stats
   # so make it a multi-line loop so can do this properly
-  print("start of analyze records")
+
+  if (DEBUG) print("start of analyze records")
+
   # this creates the key_row_df which is then no longer available outside this function
   df=dict[[master]]  # get the df containing the FULL database
   key_row_df=NULL    # this will be set to values in the comparison row for OR calc
+
   for (col_name in columns_of_interest){
     # do one df at a time
     # always start with the original full dataframe when doing combine_by
@@ -220,7 +225,7 @@ read_in_CMS_files <- function(){
 # dataframes of interest as listed here:
 # columns_of_interest=c(week, provider_num, provider_state)
 combine_by <- function (df, col_name=week) {
-  print(c("entering combine_by with col_name", col_name))
+  if (DEBUG) print(c("entering combine_by with col_name", col_name))
   # group_by wants a static column name rather than a variable
   field_symbol <- sym(col_name)
 
@@ -290,7 +295,7 @@ plot_results <- function(dict){
 
 # https://cran.r-project.org/web/packages/openxlsx2/openxlsx2.pdf
 save_to_disk <- function (dict){
-  print("entering save to disk")
+  if (DEBUG) print("entering save to disk")
   # Create a new Excel workbook
   wb <- wb_workbook()
 
@@ -320,7 +325,7 @@ save_to_disk <- function (dict){
 
 # run
 dict=main()
-print("now call for calif only")
+if (DEBUG) print("now call for calif only")
 
 # create keys for the dict for each state
 for (s in c('CA', 'TX',  'FL', 'NY','PA'))
