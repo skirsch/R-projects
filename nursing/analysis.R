@@ -19,13 +19,14 @@
 #    ...
 
 # Each state has a hash table with keys:
-#   input: df of all the rows and the key columns
+#   records: df of all the rows and the key columns
 #   week: derived from the input
 #   state: derivied
 #   provider: derived
-#   name: name of the state
+#   name: ALL or name of the state
 
-# most functions will pipe the state hash table between the function calls
+# most functions will pipe the state hash table between the function calls, not the df
+# that way there is no arguments ever needed between the functions
 
 library(openxlsx2)   # write out xlsx; doesn't need java
 library(xlsx)  # this one works without stoi exception
@@ -53,68 +54,76 @@ week1="Week.Ending"
 beds1="Number.of.All.Beds"
 key_row_num = 29   # vax rollout is Dec 11 so this is week before that (12/6/2020) = row 29 for our reference
 
-all_columns_to_extract=c(week1,provider_num1, provider_state1, cases1, deaths1, acm1, beds1)
+# define the key names used in each state dict
+# each of these 4 keys will hold a dataframe
+records='records'   # holds the master df with all the records. this is usually initialzed from root[[ALL]][[records]]
+# week is key holding the df with the week records
+# provider_num ...
+# provider_state key containing the df for by state
+# name is state name or ALL
 
-# field names in the df tables
+
+# field names inside the df tables
 cases="cases"
 deaths="deaths"
 week="week"
 provider_num="provider"
 provider_state="state"
 acm="acm"
-
-# define the key names in the dict
-master='master'   # holds the master df with all the records
-# week is key holding the df with the week records
-# provider_num ...
-# provider_state key containing the df for by state
-filter_condition='filter'  # this key contains the state to generate results for. NULL means all states
-
-# this stores the dict state after the first pass analysis. Always the same so
-# reuse each iteration as starting point
-reference='reference'
+beds="beds"
+#
+# things of interest
+#
+# fields to extract from the source file (do this just once)
+columns_to_extract=c(week1,provider_num1, provider_state1, cases1, deaths1, acm1, beds1)
 
 # columns to summarize on to create 3 summary sheets
 # these are the sheet names to create at the end
 columns_of_interest=c(week, provider_num, provider_state)
+
+# key names in root are the states of interest
+ALL = 'ALL'         # ALL states analysis; must do first since reuses this
+states_of_interest=c(ALL, 'CA', 'TX', 'FL', 'NY','PA') # all must be first
 
 
 # settable parameters
 startyear=0   # 2020
 endyear=3    # 2023 is last file read in
 
-# analyze is a dict containing 4 dataframes: master, state, provider, week
-# if re-run, we can start with this to establish metrics for filtering etc. off the base data
-analyzed='analyzed'
 
-main <- function(dict=NULL, state_name=NULL){
-  # we are coming in with either a null dict or it is preloaded
-  # read in CMS file with week added. week week num, provider, state, counts
-  if (is.null(dict)){
-    df=read_in_CMS_files()
-    dict=hashmap(list(master, df))  # start out with the key master=master db which is never modified
-    dict= dict %>% analyze_records() # dict now has all the keys added to it
+# this has the container for everything
+root=hashmap()
 
-    # the lowest level dict has no reference key
-    # the state dicts have a reference slot point
-    # circular reference a bad idea
-    dict[[reference]] = dict
-
-  } else {
-    dict=dict[[reference]]  # grab the existing pre-computed dictionary
+main <- function(){
+  for (s in states_of_interest){
+    dict=root[[s]]=hashmap()
+    dict[[name]]=s
+    process_state(dict)
   }
-  dict[[filter_condition]]=state_name  # if not null, will only generate for that state, e.g., "CA"
-  # at this point we are on our second pass through the records
-  # state if not null, means only for that state
-  dict %>% data_cleanup() %>% analyze_records()  %>%  save_to_disk()
+  # write out all the states when done
+  save_to_disk()
+}
 
-  # if this is the first time, we run (no saved reference), save the final results of the
-  # first analysis for inputs on subsequent runs
-  if (is.null(dict[[reference]]))
-      dict[[reference]] = dict
+# called once for each dict in root
+process_state <- function(dict){
+  if (DEBUG) print(paste0("processing",dict[[name]]))
+  if (dict[[name]]==ALL){
+    df=read_in_CMS_files()
+    dict[[records]]=df
+    dict %>% analyze_records() # dict now has all the keys added to it (like IFR, odds, ncacm, ...)
+    # everyone will start at root[[ALL]][[records]] dict with the 3 tables in it.
+  }
+  else
+    # everyone's records starts out being initialized from the root
+    dict[[records]]=root[[ALL]][[records]]
 
-  # return the dict
-  dict
+  # extract the records of this state, create the 3 tables, and put them in the root[state]
+  dict %>% extract_records() %>% analyze_records()
+
+  # save first analysis records to save time having to redo it later
+  # first analysis for inputs on subsequent runs since this has all offending records already removed, and all the fields computed
+  if (state==ALL)
+      dict[[ALL]][[records]] = df
 }
 
 # get the comparison row from the df and return it. Others will need it
@@ -130,7 +139,7 @@ get_key_row <- function(df){
 
 # use this to limit records we are processing
 # including head, remove bad actors and selecting a concatentation of states
-data_cleanup <- function(dict){
+extract_records <- function(dict){
   # table1=analysis by provider; table2 is the master table
   # run the analysis to do the crosstabs
   # remove the offending entries
@@ -143,11 +152,11 @@ data_cleanup <- function(dict){
   # cases =0 or > 300
   # deaths range >150
 
-  if (DEBUG) print("Entering data_cleanup")
+  if (DEBUG) print("Entering extract_records")
   table1=dict[[provider_num]]
-  table2=dict[[master]]
+  table2=dict[[records]]
 
-  state_name=dict[[filter_condition]]
+  state_name=dict[[state_name]]
   # Apply the filtering criteria to the provider table to get the provider IDs to remove
   # from the database
   filtered_table1 <- filter_criteria(table1, state_name)
@@ -157,12 +166,12 @@ data_cleanup <- function(dict){
 
   # Delete records from table2 where ProviderNumber matches
   table2 <- table2[!(table2$provider %in% selected_provider_numbers), ]
-  dict[[master]]=table2       # update the new master
-  dict   # return the dictionary
+  dict[[records]]=table2       # update the records to be the extracted records
+  dict   # return the dictionary. We can now use this to derive our three summary dataframes for weeks, provider, state
   }
 
 # Define the filtering criteria for when a record will be removed
-# called by data_cleanup
+# called by extract_records
 # this receives a df created by analysis  NOT the dict
 # the df passed in is always the PROVIDER dataframe with 11 columns
 #
@@ -192,7 +201,7 @@ filter_criteria <- function(df, state_name) {
     df %>% filter(state != state_name)
 }
 
-analyze_records <- function(dict){
+analyze_records <- function(df, state){
   # takes the original dataframe and creates 3 output summary dataframes
   # specified in columns_of_interest: state, provider_num, week
   # want to analyze by state, provider_num, week
@@ -224,7 +233,7 @@ read_in_CMS_files <- function(){
   for (i in seq(startyear,endyear,1)) {
     tbl1 <- read.csv(paste0(file_prefix, i, file_suffix))
     # just interested in key columns in the original .csv file
-    tbl1 = tbl1[, all_columns_to_extract]
+    tbl1 = tbl1[, columns_to_extract]
     # sort everything by date in column 1 which makes debugging a little easier
     # tbl1=tbl1[ order(tbl1[,1]),]
     tbl=rbind(tbl,tbl1) #  append the new table entries to the bottom
@@ -263,12 +272,13 @@ combine_by <- function (df, col_name=week) {
   # reframe to see the results.
 
   if (col_name == provider_num )
-    # for generating the provider tab, include the state of the provider in the output
+    # for generating the provider tab, include the state of the provider as well as beds
     df=df %>% group_by(!!field_symbol) %>%
        reframe(cases = sum(cases,na.rm=TRUE),
             deaths = sum(deaths, na.rm=TRUE),
             acm = sum(acm, na.rm=TRUE),
-            state=head(state,1)  # we can take any item since they are the same so take the first.
+            state=head(state,1),  # we can take any item since they are the same so take the first
+            beds=head(beds,1)    # ditto
             )
     else
     df=df %>% group_by(!!field_symbol) %>%
@@ -325,7 +335,7 @@ save_to_disk <- function (dict){
   filename=paste0(output_filename_prefix,state,".xlsx")
 
   for (sheet_name in columns_of_interest){
-    sheet_unique=paste0(sheet_name, dict[[filter_condition]])
+    sheet_unique=paste0(sheet_name, dict[[state_name]])
     write.xlsx(dict[[sheet_name]], output_file, sheetName = sheet_unique,
     col.names = TRUE, row.names = FALSE, append = TRUE)
   }
@@ -347,7 +357,7 @@ old_save_to_disk = function(dict){
     wb$add_data(x=dict[[sheet_name]])
   }
   # Save the workbook to the specified output file
-  file_suffix=dict[[filter_condition]]  # get the state
+  file_suffix=dict[[state_name]]  # get the state
   if (is.null(file_suffix))
     # it's the first run so save as specified name
     output_filename=output_file
@@ -360,15 +370,5 @@ old_save_to_disk = function(dict){
 
 
 # run
-dict=main()
-
-# create keys for the dict for each state
-# TX creates stoi error when write out workbook
-for (s in c('CA', 'TX', 'FL', 'NY','PA')){
-  if (DEBUG)
-    print(paste0("Now computing for state:",s))
-  dict[[s]]=main(dict, state=s)   # run for top 5 states
-
-
-}
+main()
 
