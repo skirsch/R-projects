@@ -28,6 +28,16 @@
 # most functions will pipe the state hash table between the function calls, not the df
 # that way there is no arguments ever needed between the functions
 
+####
+# PROCESS sequence
+#  analyze >> extract >>analyze -->  create initial db of records
+#  initial db of records  >>extract >> analyze for states
+#  the "analyze" routine will call combine_by to create the new df tables week, provider, state
+#  the extract will call filter...
+####
+
+
+
 library(openxlsx2)   # write out xlsx; doesn't need java
 library(xlsx)  # this one works without stoi exception
 library(dplyr) # need for pipe operation to work
@@ -61,7 +71,7 @@ records='records'   # holds the master df with all the records. this is usually 
 # provider_num ...
 # provider_state key containing the df for by state
 # name is state name or ALL
-
+name='name'
 
 # field names inside the df tables
 cases="cases"
@@ -106,7 +116,7 @@ main <- function(){
 
 # called once for each dict in root
 process_state <- function(dict){
-  if (DEBUG) print(paste0("processing",dict[[name]]))
+  if (DEBUG) print(paste("processing",dict[[name]]))
   if (dict[[name]]==ALL){
     df=read_in_CMS_files()
     dict[[records]]=df
@@ -114,16 +124,14 @@ process_state <- function(dict){
     # everyone will start at root[[ALL]][[records]] dict with the 3 tables in it.
   }
   else
-    # everyone's records starts out being initialized from the root
+    # everyone's records starts out being initialized from the root.
+    # need the records table and provider tables for the extraction to work before analyze
     dict[[records]]=root[[ALL]][[records]]
+    dict[[provider_num]]=root[[ALL]][[provider_num]]
 
   # extract the records of this state, create the 3 tables, and put them in the root[state]
   dict %>% extract_records() %>% analyze_records()
 
-  # save first analysis records to save time having to redo it later
-  # first analysis for inputs on subsequent runs since this has all offending records already removed, and all the fields computed
-  if (state==ALL)
-      dict[[ALL]][[records]] = df
 }
 
 # get the comparison row from the df and return it. Others will need it
@@ -138,7 +146,10 @@ get_key_row <- function(df){
 }
 
 # use this to limit records we are processing
-# including head, remove bad actors and selecting a concatentation of states
+# if dict[[name]]==ALL, we want to remove the BAD records
+# else we will filter out all other states and make sure dict[[records]] is set to the result
+#
+# Purpose: replace the records dict with the extracted records dict (either just this state or cleaned original records if ALL)
 extract_records <- function(dict){
   # table1=analysis by provider; table2 is the master table
   # run the analysis to do the crosstabs
@@ -153,20 +164,24 @@ extract_records <- function(dict){
   # deaths range >150
 
   if (DEBUG) print("Entering extract_records")
-  table1=dict[[provider_num]]
-  table2=dict[[records]]
+  table1=dict[[provider_num]] # the provider table so we do analysis on the providers to determine which ones to remove
+  table2=dict[[records]]  # all the records
 
-  state_name=dict[[state_name]]
+  state_name=dict[[name]]
   # Apply the filtering criteria to the provider table to get the provider IDs to remove
   # from the database
+  # state_name will be a specific state name or ALL and the function will do the right thing
   filtered_table1 <- filter_criteria(table1, state_name)
+  # For case ALL, filtered_table1 returned should be a very SHORT list of providers which are problematic (under 1,000)
+  # For all other cases, fitered_table1 will be a LONG list of providers in every state except the desired state
+
 
   # Get a list of ProviderNumbers meeting the criteria
   selected_provider_numbers <- filtered_table1$provider
 
   # Delete records from table2 where ProviderNumber matches
   table2 <- table2[!(table2$provider %in% selected_provider_numbers), ]
-  dict[[records]]=table2       # update the records to be the extracted records
+  dict[[records]]=table2       # update the records to be the extracted records. Now we'll be ready to analyze
   dict   # return the dictionary. We can now use this to derive our three summary dataframes for weeks, provider, state
   }
 
@@ -180,28 +195,28 @@ extract_records <- function(dict){
 # which should be removed based on the overall stats for that provider.
 # we need to add state as a column in the provider df here for this to work properly
 
-# this function gets calle ONCE each time you call main
+# this function gets called ONCE each time you call main
 # if this is re-run, the database you are starting with has already had the bad QA
 # records already tossed. So if you try to run the removal criteria again, you'll get 0 records
 # for the second criteria. So solution is to use the initial criteria if state isn't specified,
 # and use the other criteria when it is
 filter_criteria <- function(df, state_name) {
-  if (is.null(state_name))
+  if (state_name == ALL){
     # filter will return the records that match the criteria
     # then we will take these records (which are "bad") and remove them
     # based on their provider ID
     df %>% filter(ifr > 1 | deaths > 150 | cases > 300 | cases ==0 |
              (cases>100 & deaths==0) )
-
-  else
-    # select the recrods which do NOT match the state name so they can be removed
-    # so this will be a big list of all states we don't want
-    # we basically just want to leave calif
+  }
+  else {
+    # select the records which do NOT match the state name so they can be removed
+    # so this will be a big list of all states we don't want, e.g., everything but CA for the CA pass
     # note that state will be interpreted as a literal field name to match the column
     df %>% filter(state != state_name)
+  }
 }
 
-analyze_records <- function(df, state){
+analyze_records <- function(dict){
   # takes the original dataframe and creates 3 output summary dataframes
   # specified in columns_of_interest: state, provider_num, week
   # want to analyze by state, provider_num, week
@@ -212,7 +227,7 @@ analyze_records <- function(df, state){
   if (DEBUG) print("start of analyze records")
 
   # this creates the key_row_df which is then no longer available outside this function
-  df=dict[[master]]  # get the df containing the FULL database
+  df=dict[[records]]  # get the df containing the FULL database
   key_row_df=NULL    # this will be set to values in the comparison row for OR calc
 
   for (col_name in columns_of_interest){
@@ -243,6 +258,7 @@ read_in_CMS_files <- function(){
   tbl %>% mutate_at(vars(week), mdy)  # set date type for the date
 }
 
+# called by analyze_records
 # combine cases and deaths with the same week into one row for each week
 # one row per week (instead of 15,000 rows)
 # this is called by analyze records 3 times; once for each of the 3 derived
@@ -286,7 +302,8 @@ combine_by <- function (df, col_name=week) {
             deaths = sum(deaths, na.rm=TRUE),
             acm = sum(acm, na.rm=TRUE)
             )
-    return(df)   # return the derived sheet (either weeks, provider, state)
+  dict[[col_name]]=df        # save it away in the dict for that state
+  return(df)   # return the derived sheet (either weeks, provider, state)
 }
 
 # add new computed columns (so long as computed from values in same row it's easy)
@@ -328,46 +345,43 @@ plot_results <- function(dict){
 
 
 # http://www.sthda.com/english/wiki/writing-data-from-r-to-excel-files-xls-xlsx
-save_to_disk <- function (dict){
+old_save_to_disk <- function (){
   if (DEBUG) print("entering save to disk")
 
-  # will give error if sheet name already exists
-  filename=paste0(output_filename_prefix,state,".xlsx")
+  # this will write out the root dicts to excel file for each key
+  # in the root hashtable
 
-  for (sheet_name in columns_of_interest){
-    sheet_unique=paste0(sheet_name, dict[[state_name]])
-    write.xlsx(dict[[sheet_name]], output_file, sheetName = sheet_unique,
-    col.names = TRUE, row.names = FALSE, append = TRUE)
+  # will give error if sheet name already exists
+  for (state in states_of_interest){
+    filename=paste0(output_filename_prefix,state,".xlsx")
+
+    # append is FALSE for the first sheet name, true for the rest
+    # so will create new file
+    for (sheet_name in columns_of_interest){
+            write.xlsx(dict[[sheet_name]], output_file, sheetName = sheet_name,
+        col.names = TRUE, row.names = FALSE, append =(sheet_name!=columns_of_interest[[1]]))
+    }
   }
 }
 
 # https://cran.r-project.org/web/packages/openxlsx2/openxlsx2.pdf
-old_save_to_disk = function(dict){
-  wb <- wb_workbook()
+save_to_disk = function(){
+  for (state in states_of_interest){
+    filename=paste0(output_filename_prefix,state,".xlsx")
+    dict=root[[state]]
 
-  # Loop over the list and add each dataframe to a separate worksheet
-  # if the dataframes in the list don't have a name, nothing will be written
-  # so pass in list(sheet1=df1, mysheet2=df2)
-  # if the dataframes list is empty, you'll get a warning about no worksheets
+    # append is FALSE for the first sheet name, true for the rest
+    # so will create new file
 
-  for (sheet_name in columns_of_interest) {
-    # create empty sheet with given name
-    wb$add_worksheet(sheet_name)
-    # now add the dataframe to that sheet
-    wb$add_data(x=dict[[sheet_name]])
+    wb <- wb_workbook()
+    for (sheet_name in columns_of_interest){
+      wb$add_worksheet(sheet_name)
+      # now add the dataframe to that sheet
+      wb$add_data(x=dict[[sheet_name]])
+    }
+    wb$save(filename)
   }
-  # Save the workbook to the specified output file
-  file_suffix=dict[[state_name]]  # get the state
-  if (is.null(file_suffix))
-    # it's the first run so save as specified name
-    output_filename=output_file
-  else
-    # append _CA if calif
-    output_filename=sub("\\.", paste0("_", file_suffix,"."),output_file)
-  wb$save(output_filename)
-  dict # return the dict for others to process
 }
-
 
 # run
 main()

@@ -583,3 +583,33 @@ for looking for ., must quote it since first is a regular expression
 
 terminate iteration of for loop
     if (sheet_name==master) next  # don't write out master spreadsheet
+
+
+
+
+
+
+
+  # Loop over the list and add each dataframe to a separate worksheet
+  # if the dataframes in the list don't have a name, nothing will be written
+  # so pass in list(sheet1=df1, mysheet2=df2)
+  # if the dataframes list is empty, you'll get a warning about no worksheets
+
+  for (sheet_name in columns_of_interest) {
+    # create empty sheet with given name
+  }
+  # Save the workbook to the specified output file
+  file_suffix=dict[[state_name]]  # get the state
+  if (is.null(file_suffix))
+    # it's the first run so save as specified name
+    output_filename=output_file
+  else
+    # append _CA if calif
+
+        output_filename=sub("\\.", paste0("_", file_suffix,"."),output_file)
+
+
+  dict # return the dict for others to process
+}
+
+
