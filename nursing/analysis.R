@@ -1,10 +1,14 @@
 # analyze CMS Nursing Home data
 
+# issues: not extracting calif
+# calling save_to_disk at start?!?
+
 # todo:
 # rerun(state) will re-run it using the given state
 # and save to a special filename
 
-# write this up, survey, pfizer study on
+
+# write this up,  pfizer study on preg with retsef levy
 #
 
 # hashtable is called dict
@@ -58,7 +62,7 @@ filter_condition='filter'  # this key contains the state to generate results for
 # reuse each iteration as starting point
 reference='reference'
 
-# columns to summarize on
+# columns to summarize on to create 3 summary sheets
 # these are the sheet names to create at the end
 columns_of_interest=c(week, provider_num, provider_state)
 
@@ -77,10 +81,12 @@ main <- function(dict=NULL, state_name=NULL){
   if (is.null(dict)){
     df=read_in_CMS_files()
     dict=hashmap(list(master, df))  # start out with the key master=master db which is never modified
-    dict= dict %>% analyze_records() # dict now has all the keys
-    dict[[reference]] = dict        # save a copy of the "reference dictionary" for subsequent passes
+    dict= dict %>% analyze_records() # dict now has all the keys added to it
+
+    # save a copy of the "reference dictionary" for subsequent passes
+    dict[[reference]] = dict
   } else {
-    dict=dict[reference]  # replace dict with the reference gold standard so we wind back the clock
+    dict=dict[[reference]]  # grab the existing pre-computed dictionary
   }
   dict[[filter_condition]]=state_name  # if not null, will only generate for that state, e.g., "CA"
   # at this point we are on our second pass through the records
@@ -117,8 +123,7 @@ data_cleanup <- function(dict){
   # cases =0 or > 300
   # deaths range >150
 
-
-
+  print("Entering data_cleanup")
   table1=dict[[provider_num]]
   table2=dict[[master]]
 
@@ -137,8 +142,12 @@ data_cleanup <- function(dict){
 
 # Define the filtering criteria for when a record will be removed
 # called by data_cleanup
-# this receives a df  NOT the dict
-# the df passed in is always the MASTER df with all the records
+# this receives a df created by analysis  NOT the dict
+# the df passed in is always the PROVIDER dataframe with 10 columns
+# the references here are the hard coded column names in this dataframe
+# This function is used ONLY to determine the provider numbers
+# which should be removed based on the overall stats for that provider.
+# we need to add state as a column in the provider df here for this to work properly
 filter_criteria <- function(df, state_name) {
   df=df %>%
     # filter will remove the matching records
@@ -146,14 +155,16 @@ filter_criteria <- function(df, state_name) {
              (cases>100 & deaths==0) )
 
   # remove records which do NOT match the state name
-  if (!is.null(state_name))
-    df= df %>% filter(provider_state != state_name)
+  if (!(is.null(state_name)))
+    # note that state will be interpreted as a literal field name to match the column
+    df= df %>% filter(state != state_name)
 
   return(df)
 }
 
 analyze_records <- function(dict){
-  # takes the original dataframe
+  # takes the original dataframe and creates 3 output summary dataframes
+  # specified in columns_of_interest: state, provider_num, week
   # want to analyze by state, provider_num, week
   # dict=list(master=df)    # initialize the list df is the "master" df with all values
   # make sure to do the get key row call after doing combine by week call and BEFORE calc stats
@@ -179,10 +190,11 @@ read_in_CMS_files <- function(){
   tbl=data.frame()   # create empty container
   for (i in seq(startyear,endyear,1)) {
     tbl1 <- read.csv(paste0(file_prefix, i, file_suffix))
+    # now just interested in 6 columns in the original .csv file
     tbl1 = tbl1[,c(week1,provider_num1, provider_state1, cases1, deaths1, acm1)]
     # sort everything by date in column 1 which makes debugging a little easier
     # tbl1=tbl1[ order(tbl1[,1]),]
-    tbl=rbind(tbl,tbl1) #  append the new table entries
+    tbl=rbind(tbl,tbl1) #  append the new table entries to the bottom
   }
   # set new column names for use in summarize inside of combine_weeks
   colnames(tbl)=c(week, provider_num, provider_state, cases, deaths, acm)
@@ -191,30 +203,48 @@ read_in_CMS_files <- function(){
 
 # combine cases and deaths with the same week into one row for each week
 # one row per week (instead of 15,000 rows)
+# this is called by analyze records 3 times; once for each of the 3 derived
+# dataframes of interest as listed here:
+# columns_of_interest=c(week, provider_num, provider_state)
 combine_by <- function (df, col_name=week) {
   print(c("entering combine_by with col_name", col_name))
   # group_by wants a static column name rather than a variable
   field_symbol <- sym(col_name)
 
   # this will output 4 column df including the field you are grouping by
-  # so you'll only see weeks when group by weeks,
+  # so you'll only see a weeks when you group by weeks,
   # you'll only see providers (and 3 other columns) when group by providers
   # etc.
-  df %>% group_by(!!field_symbol) %>%
-  summarise(cases = sum(cases,na.rm=TRUE),
+
+  # so this is where we specify which columns appear in the output
+  # before we start tacking on the analysis to the core columns
+
+  # if we are summarizing by provider num, it makes sense to add state
+  # to the output
+
+  # returns the dataframe
+  if (col_name == provider_num )
+    df %>% group_by(!!field_symbol) %>%
+    summarise(cases = sum(cases,na.rm=TRUE),
+            deaths = sum(deaths, na.rm=TRUE),
+            acm = sum(acm, na.rm=TRUE),
+            state=head(state,1)  # we can take any item since they are the same so take the first.
+            )
+    else
+    df %>% group_by(!!field_symbol) %>%
+    summarise(cases = sum(cases,na.rm=TRUE),
             deaths = sum(deaths, na.rm=TRUE),
             acm = sum(acm, na.rm=TRUE)
             )
 }
 
-
-
 # add new computed columns (so long as computed from values in same row it's easy)
+# input has week, cases, deaths columns (columns of interest)
+# add 4 new computed columns: ncacm, ifr, odds, OR, RR, and ARR
+# key_row_df has the elements we need to compute the stats and is passed in
+# be sure to order these so if newest columns need older columns, they are there
+
 calc_stats <- function (df, key_row_df){
-  # input has week, cases, deaths columns
-  # add 4 new computed columns: ncacm, ifr, dead:alive odds, and derivatives
-  # key_row_df has the elements we need to compute the stats and is passed in
-  # be sure to order these so if newest columns need older columns, they are there
 
   ifr_ref = key_row_df$ifr
   odds_ref = key_row_df$odds
@@ -247,7 +277,7 @@ plot_results <- function(dict){
 
 # https://cran.r-project.org/web/packages/openxlsx2/openxlsx2.pdf
 save_to_disk <- function (dict){
-
+  print("entering save to disk")
   # Create a new Excel workbook
   wb <- wb_workbook()
 
@@ -265,7 +295,7 @@ save_to_disk <- function (dict){
   # Save the workbook to the specified output file
   file_suffix=dict[[filter_condition]]
   output_filename=sub("\\.", paste0("_", file_suffix,"."),output_file)
-  wb$save(paste0(output_file, ))
+  wb$save(output_filename)
   dict # return the dict for others to process
 }
 
