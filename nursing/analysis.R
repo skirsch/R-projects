@@ -1,11 +1,20 @@
 # analyze CMS Nursing Home data
 
-# remove the _ in filename. Comment out the print.
+# CONFIGURATION PARAMETERS
+DEBUG=FALSE
+SAVE_TO_DISK=TRUE
+ALL_STATES=TRUE
+CASE_LAG=0    # set to fraction of a week to delay cases by when computing stats
 
-# todo:
-# rerun(state) will re-run it using the given state
-# and save to a special filename
-
+# to do...
+# do a transform on the cases
+# cases that lag by a preset amount (e.g., 3/7 of a weed)
+# with a goal of minimizing the IFR peaks and valley
+# this is easily done by doing a transform on the cases column
+# where cases <- .2*cases + .8*lag(c) which shifts the cases to the future
+# by a small amount
+#
+# check this in Excel and see if it makes an impact on the IFR curve before coding
 
 
 # Data structure
@@ -37,7 +46,6 @@
 ####
 
 
-
 library(openxlsx2)   # write out xlsx; doesn't need java
 library(xlsx)  # this one works without stoi exception
 library(dplyr) # need for pipe operation to work
@@ -47,7 +55,7 @@ library(ggplot2)
 library(rlang)
 library(r2r)  # hash tables
 
-DEBUG=TRUE
+
 
 mydir="nursing/data/"
 file_prefix=paste0(mydir,"faclevel_202")
@@ -93,7 +101,14 @@ columns_of_interest=c(week, provider_num, provider_state)
 
 # key names in root are the states of interest
 ALL = 'ALL'         # ALL states analysis; must do first since reuses this
-states_of_interest=c(ALL, 'CA', 'TX', 'FL', 'NY','PA') # all must be first
+# Note that ALL must be listed first in each list
+all_states <- c(ALL, 'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY')
+top5_states <- c(ALL, 'CA', 'TX', 'FL', 'NY','PA') # top 5
+
+states_of_interest=top5_states
+
+if (ALL_STATES)
+  states_of_interest=all_states
 
 
 # settable parameters
@@ -110,7 +125,8 @@ main <- function(){
     dict[[name]]=s
     process_state(dict)
   }
-  # write out all the states when done
+  OR_analysis()     # look at geo mean of OR in Feb 2021
+  # write out all the statesand ALL when done
   save_to_disk()
 }
 
@@ -366,6 +382,7 @@ old_save_to_disk <- function (){
 
 # https://cran.r-project.org/web/packages/openxlsx2/openxlsx2.pdf
 save_to_disk = function(){
+  if (!SAVE_TO_DISK) return()
   for (state in states_of_interest){
     filename=paste0(output_filename_prefix,state,".xlsx")
     dict=root[[state]]
@@ -374,13 +391,67 @@ save_to_disk = function(){
     # so will create new file
 
     wb <- wb_workbook()
-    for (sheet_name in columns_of_interest){
+    columns=columns_of_interest
+    # the ALL spreadsheet has an additional key
+    if (state==ALL)
+      columns=c(columns, OR_analysis_key)
+    for (sheet_name in columns){
       wb$add_worksheet(sheet_name)
       # now add the dataframe to that sheet
       wb$add_data(x=dict[[sheet_name]])
     }
     wb$save(filename)
   }
+}
+
+extract_numeric_values <- function(input_list) {
+  numeric_values <- input_list[is.numeric(input_list) &
+                                 is.finite(input_list) &
+                                 input_list >= -10 &
+                                 input_list <= 10]
+  return(numeric_values)
+}
+
+# use this for the average of the OR values
+# this takes a list of values and returns a SINGLE value
+geometric_mean <- function(v) {
+  print(paste("arg to mean INPUT are", v))
+  v=extract_numeric_values(v)
+  if (is.null(v))
+      return(1)
+  print(paste("arg to mean are", v))
+  exp(mean(log(v)))
+}
+
+OR_analysis_key="or_analysis"   # hashmap key name for summary analysis stored in ALL
+
+OR_analysis=function(){
+  # make a dataframe of the state and the log of the OR value averaged over Feb (rows ) (geometric mean) for each state
+  # Empty vectors to store results
+  state_names <- character()
+  avg_values <- numeric()
+
+  # Iterate over state hashmaps
+  for (key in keys(root)) { # iterate over the states
+    state=root[[key]]   # get the hashmap for the state
+    state_name <- state[[name]]
+    week_df <- state[[week]]
+    vals = week_df$odds_ratio[38:41]
+
+    avg_value <- geometric_mean(vals)
+    print(paste(state_name,": ", vals, "returned", avg_value))
+    state_names <- append(state_names, state_name)
+    avg_values <- append(avg_values, avg_value)
+  }
+
+  # Create a new dataframe
+  result_df <- data.frame(
+    State = state_names,
+    OR_mean = avg_values
+  )
+
+  # save it in root under ALL
+  root[[ALL]][[OR_analysis_key]]=result_df
 }
 
 # run
