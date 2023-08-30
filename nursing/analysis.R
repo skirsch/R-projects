@@ -415,11 +415,12 @@ extract_numeric_values <- function(input_list) {
 # use this for the average of the OR values
 # this takes a list of values and returns a SINGLE value
 geometric_mean <- function(v) {
-  print(paste("arg to mean INPUT are", v))
+  print(sprintf("before extract numeric are %g", v))
   v=extract_numeric_values(v)
+  print(sprintf("after extract numeric are %g", v))
   if (is.null(v))
       return(1)
-  print(paste("arg to mean are", v))
+  print(sprintf("arg to mean(log(v)) are %g", v))
   exp(mean(log(v)))
 }
 
@@ -429,25 +430,37 @@ OR_analysis=function(){
   # make a dataframe of the state and the log of the OR value averaged over Feb (rows ) (geometric mean) for each state
   # Empty vectors to store results
   state_names <- character()
-  avg_values <- numeric()
+  odds_values <- numeric()
+  OR_values <- numeric()
+  OR_reference <- numeric()
 
   # Iterate over state hashmaps
   for (key in keys(root)) { # iterate over the states
     state=root[[key]]   # get the hashmap for the state
     state_name <- state[[name]]
     week_df <- state[[week]]
-    vals = week_df$odds_ratio[38:41]
-
-    avg_value <- geometric_mean(vals)
-    print(paste(state_name,": ", vals, "returned", avg_value))
+    cases = sum(week_df$cases[37:40])    # take infections from earlier
+    deaths = sum(week_df$deaths[38:41])  # months of feb
+    odds=deaths/(cases-deaths)
+    odds_reference = week_df$odds[[29]]
+    odds_ratio=odds/odds_reference
     state_names <- append(state_names, state_name)
-    avg_values <- append(avg_values, avg_value)
+    odds_values <- append(odds_values, odds)
+    OR_reference <- append(OR_reference, odds_reference)
+    OR_values <- append(OR_values, odds_ratio)
   }
+
+  print(state_names)
+  print(OR_values)
+  print(OR_reference)
+  print(odds_values)
 
   # Create a new dataframe
   result_df <- data.frame(
     State = state_names,
-    OR_mean = avg_values
+    OR_values = OR_values,
+    OR_reference = OR_reference,
+    odds = odds_values
   )
 
   # save it in root under ALL
