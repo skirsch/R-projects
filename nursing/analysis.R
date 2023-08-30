@@ -1,12 +1,29 @@
 # analyze CMS Nursing Home data
 
+# field names inside the df tables
+cases="cases"
+deaths="deaths"
+week="week"
+provider_num="provider"
+provider_state="state"
+acm="acm"
+beds="beds"
+
+
 # CONFIGURATION PARAMETERS
 DEBUG=FALSE
 SAVE_TO_DISK=TRUE
 ALL_STATES=TRUE
-CASE_LAG=0    # set to fraction of a week to delay cases by when computing stats
+CASE_LAG=1    # set number of weeks to lag cases when doing calculations with deaths & cases
+# for all analysis, we extract out the 4 OR values for February from each state
+ALL_ANALYSIS_ROWS:seq(38,41)  # 38-41 will extract OR values from Feb 2021
+ALL_ANALYSIS_COLUMNS:c(provider_state) # all the other columns are already summarized
 
 # to do...
+# add lag(cases, CASE_LAG) to computations
+# add new global_summary() function like I asked chatgpt that extracts
+# the "target row" of state db, plus some interesting columns as well, e.g., 4 weeks OR
+
 # do a transform on the cases
 # cases that lag by a preset amount (e.g., 3/7 of a weed)
 # with a goal of minimizing the IFR peaks and valley
@@ -81,14 +98,6 @@ records='records'   # holds the master df with all the records. this is usually 
 # name is state name or ALL
 name='name'
 
-# field names inside the df tables
-cases="cases"
-deaths="deaths"
-week="week"
-provider_num="provider"
-provider_state="state"
-acm="acm"
-beds="beds"
 #
 # things of interest
 #
