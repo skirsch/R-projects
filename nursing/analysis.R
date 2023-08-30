@@ -430,37 +430,43 @@ OR_analysis=function(){
   # make a dataframe of the state and the log of the OR value averaged over Feb (rows ) (geometric mean) for each state
   # Empty vectors to store results
   state_names <- character()
+  odds_ref_values <- numeric()
   odds_values <- numeric()
   OR_values <- numeric()
-  OR_reference <- numeric()
 
   # Iterate over state hashmaps
   for (key in keys(root)) { # iterate over the states
     state=root[[key]]   # get the hashmap for the state
     state_name <- state[[name]]
     week_df <- state[[week]]
-    cases = sum(week_df$cases[37:40])    # take infections from earlier
-    deaths = sum(week_df$deaths[38:41])  # months of feb
+
+    cases = sum(week_df$cases[38:40])    # take infections from earlier
+    deaths = sum(week_df$deaths[39:41])  # months of feb
+
+    ref_cases =sum(week_df$cases[27:29])
+    ref_deaths = sum(week_df$deaths[28:30])
+
     odds=deaths/(cases-deaths)
-    odds_reference = week_df$odds[[29]]
+    odds_reference = ref_deaths/(ref_cases-ref_deaths)
     odds_ratio=odds/odds_reference
+
     state_names <- append(state_names, state_name)
     odds_values <- append(odds_values, odds)
-    OR_reference <- append(OR_reference, odds_reference)
+    odds_ref_values <- append(odds_ref_values, odds_reference)
     OR_values <- append(OR_values, odds_ratio)
   }
 
   print(state_names)
-  print(OR_values)
-  print(OR_reference)
   print(odds_values)
+  print(odds_ref_values)
+  print(OR_values)
 
   # Create a new dataframe
   result_df <- data.frame(
     State = state_names,
-    OR_values = OR_values,
-    OR_reference = OR_reference,
-    odds = odds_values
+    odds = odds_values,
+    odds_ref = odds_ref_values,
+    odds_ratio = OR_values
   )
 
   # save it in root under ALL
