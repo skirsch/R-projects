@@ -1,5 +1,9 @@
 # analyze CMS Nursing Home data
 
+# test the new code with the lag
+# see what happens with LAG of 2
+# todo: use the new summarize snippet to add summary to ALL of the OR values in Feb
+
 # field names inside the df tables
 cases="cases"
 deaths="deaths"
@@ -159,15 +163,29 @@ process_state <- function(dict){
 
 }
 
+# to compute all rows, we first need to compute the odds of the reference row
+# so do that here and return the whole row for everyone to use.
+# so basically, we do a special computation to compute just the reference
+# row first, and we squirrel it away (we do not append it) here for
+# others to reference
 # get the comparison row from the df and return it. Others will need it
 get_key_row <- function(df){
-  dfk=df[key_row_num,]    # without the comma, returns col 1. Get a dataframe of 1 row
+  # grab the key row and the row above it so we can grab the cases from
+  # there. Use CASE_LAG for where to grab cases from
+  dfk_cases[key_row_num-CASE_LAG,]# grab reference cases from row above
+  dfk_deaths=df[key_row_num,]    # without the comma, returns col 1. Get a dataframe of 1 row
   # now add computed columns IFR and Odds which makes other code easier
-  cases_ref=dfk$cases  # grab cases
-  deaths_ref=dfk$deaths # grab deaths
-  # add the two computed columns
+  # dfk is a dataframe of ONE row
+  cases_ref=dfk_cases$cases  # grab cases column
+  deaths_ref=dfk_deaths$deaths # grab deaths column
+
+  # the LAG IS NOW ALREADY IN THE VALUES!
+  # no need to lag when using them
+  # add the two computed columns to our one special row
   dfk %>% cbind(ifr=deaths_ref/cases_ref) %>%
   cbind(odds=deaths_ref/(cases_ref-deaths_ref))
+  # now we have this special 1 row new dataframe that everyone can reference
+  # when computing all the derived columns
 }
 
 # use this to limit records we are processing
@@ -343,8 +361,8 @@ calc_stats <- function (df, key_row_df){
   odds_ref = key_row_df$odds
 
   df %>% mutate(ncacm = acm-deaths) %>%
-     mutate(ifr = deaths/cases) %>%
-     mutate(odds = deaths/(cases-deaths)) %>%
+     mutate(ifr = deaths/lag(cases,CASE_LAG)) %>%
+     mutate(odds = deaths/(lag(cases, CASELAG)-deaths)) %>%
      mutate(odds_ratio=odds/odds_ref) %>% # OR
      mutate(rr =   ifr/ifr_ref) %>% # RR
      mutate(arr = ifr_ref-ifr) # ARR... note the reference is first
