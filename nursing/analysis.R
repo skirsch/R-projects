@@ -10,7 +10,7 @@
 # OR nearly 2:1 on 2/28/01 *after* the case rates no longer falling
 # so can't use rapidly falling case rates as "excuse" for high OR and IFR.
 # We have 1. neutralized that with the time lag and 2. the peak happened when
-# case rates had stabilized
+# case rates had stabilized and 3. The OR stayed above 1 until 4/4/21!!!
 
 # field names inside the df tables
 cases="cases"
