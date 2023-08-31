@@ -4,6 +4,13 @@
 # see what happens with LAG of 2
 # todo: use the new summarize snippet to add summary to ALL of the OR values in Feb
 
+# 8/30/23: revised analysis with time lag worked perfectly.
+# vaccine made things worse.
+# OR nearly 2:1 on 2/28/01 *after* the case rates no longer falling
+# so can't use rapidly falling case rates as "excuse" for high OR and IFR.
+# We have 1. neutralized that with the time lag and 2. the peak happened when
+# case rates had stabilized
+
 # field names inside the df tables
 cases="cases"
 deaths="deaths"
