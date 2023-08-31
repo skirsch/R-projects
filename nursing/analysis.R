@@ -476,6 +476,14 @@ to_named_list <- function(hashmap) {
 
 
 columns_to_summarize=c("odds_ratio", "arr")
+
+# min max values to apply to the summarized data
+columns_to_summarize_limits=list(
+  # excel does a horrible job with y-axis labels on
+  # scatter plots so this limits to 4
+  odds_ratio=list(0,4),
+  arr=list(-1,1))
+
 # summarize_columns is called by main()
 # it creates a dataframe with columns: week ALL AL AK ... <state names>
 # and a row for each week
@@ -500,12 +508,21 @@ summarize_columns=function(){
     # extract out the column of interest of this iteration
     df=extract_and_bind_columns(dataframe_list, all_key)
 
-    # concatenate the two dataframes
-    result_df=cbind(week_column, df)
+    # concatenate the two dataframes, and then apply any limits
+    result_df=cbind(week_column, df) %>% clean_up_dataframe(columns_to_summarize_limits[[all_key]])
 
     # save it in root under ALL
     root[[ALL]][[all_key]]=result_df
   }
+}
+# given a dataframe, limit the values to a range but don't apply to
+# the named column
+clean_up_dataframe <- function(df, limits_list, ignore_column=week){
+  min_value=limits_list[[1]]
+  max_value=limits_list[[2]]
+  df %>%
+    mutate(across(-all_of(ignore_column), ~ pmin(pmax(.x, min_value), max_value)))
+
 }
 
 # run
