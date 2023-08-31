@@ -20,8 +20,8 @@ SAVE_TO_DISK=TRUE
 ALL_STATES=TRUE
 CASE_LAG=1    # set number of weeks to lag cases when doing calculations with deaths & cases
 # for all analysis, we extract out the 4 OR values for February from each state
-ALL_ANALYSIS_ROWS:seq(38,41)  # 38-41 will extract OR values from Feb 2021
-ALL_ANALYSIS_COLUMNS:c(provider_state) # all the other columns are already summarized
+ALL_ANALYSIS_ROWS=seq(38,41)  # 38-41 will extract OR values from Feb 2021
+ALL_ANALYSIS_COLUMNS=c(provider_state) # all the other columns are already summarized
 
 # to do...
 # add lag(cases, CASE_LAG) to computations
@@ -169,10 +169,12 @@ process_state <- function(dict){
 # row first, and we squirrel it away (we do not append it) here for
 # others to reference
 # get the comparison row from the df and return it. Others will need it
+# so if everything worked right, the main analysis will compute an OR of 1
+# for the reference row, an an ARR of 0, etc.
 get_key_row <- function(df){
   # grab the key row and the row above it so we can grab the cases from
   # there. Use CASE_LAG for where to grab cases from
-  dfk_cases[key_row_num-CASE_LAG,]# grab reference cases from row above
+  dfk_cases=df[key_row_num-CASE_LAG,]# grab reference cases from row above
   dfk_deaths=df[key_row_num,]    # without the comma, returns col 1. Get a dataframe of 1 row
   # now add computed columns IFR and Odds which makes other code easier
   # dfk is a dataframe of ONE row
@@ -182,7 +184,8 @@ get_key_row <- function(df){
   # the LAG IS NOW ALREADY IN THE VALUES!
   # no need to lag when using them
   # add the two computed columns to our one special row
-  dfk %>% cbind(ifr=deaths_ref/cases_ref) %>%
+  # (use the deaths row) since the cases row is lagged
+  dfk_deaths %>% cbind(ifr=deaths_ref/cases_ref) %>%
   cbind(odds=deaths_ref/(cases_ref-deaths_ref))
   # now we have this special 1 row new dataframe that everyone can reference
   # when computing all the derived columns
@@ -362,7 +365,7 @@ calc_stats <- function (df, key_row_df){
 
   df %>% mutate(ncacm = acm-deaths) %>%
      mutate(ifr = deaths/lag(cases,CASE_LAG)) %>%
-     mutate(odds = deaths/(lag(cases, CASELAG)-deaths)) %>%
+     mutate(odds = deaths/(lag(cases, CASE_LAG)-deaths)) %>%
      mutate(odds_ratio=odds/odds_ref) %>% # OR
      mutate(rr =   ifr/ifr_ref) %>% # RR
      mutate(arr = ifr_ref-ifr) # ARR... note the reference is first
@@ -454,6 +457,7 @@ geometric_mean <- function(v) {
 OR_analysis_key="or_analysis"   # hashmap key name for summary analysis stored in ALL
 
 OR_analysis=function(){
+  # replace with new fcn
   # make a dataframe of the state and the log of the OR value averaged over Feb (rows ) (geometric mean) for each state
   # Empty vectors to store results
   state_names <- character()
