@@ -20,6 +20,8 @@ provider_num="provider"
 provider_state="state"
 acm="acm"
 beds="beds"
+odds_ratio="odds_ratio"
+arr="arr"
 
 
 # CONFIGURATION PARAMETERS
@@ -433,11 +435,10 @@ save_to_disk = function(){
 summarize_columns_key="summary"   # hashmap key name for summary analysis stored in ALL
 # the names of the columns to summarize. use !!sym(name) in the functions
 
-# this function extracts odds_ratio and arr columns from all states
-# including ALL.
-#
-
 # helper function for summarize columns
+# this function extracts a given column from all dataframes
+# and returns a dataframe of the extracted columns
+
 extract_and_bind_columns <- function(dataframe_list, column_name) {
   extracted_columns <- lapply(dataframe_list, function(df) df[[column_name]])
   result_dataframe <- do.call(cbind, extracted_columns)
@@ -445,20 +446,66 @@ extract_and_bind_columns <- function(dataframe_list, column_name) {
   return(result_dataframe)
 }
 
+# another helper function to create a named dataframe list (sorted)
+create_dataframe_list <- function(hash_table){
+
+  # Extract key-value pairs from the hash table
+  # as.list(hash_table) doesn't work for hash tables
+  key_value_pairs <- to_named_list(hash_table)
+
+  # Sort key-value pairs by key
+  sorted_pairs <- key_value_pairs[order(names(key_value_pairs))]
+
+  # Create a named list from sorted pairs
+  sorted_named_list <- setNames(sorted_pairs, names(sorted_pairs))
+}
+
+# another helper function to convert hashmap to
+# a named list of the week dataframe in each hashmap key
+to_named_list <- function(hashmap) {
+  list <- list()
+
+  for (key in keys(hashmap)) {
+    list[[key]] <- hashmap[[key]][[week]]
+  }
+
+  names(list) <- keys(hashmap)
+
+  list
+}
+
+
 columns_to_summarize=c("odds_ratio", "arr")
 # summarize_columns is called by main()
-# it creates a dataframe with columns: week ALL <state names>
+# it creates a dataframe with columns: week ALL AL AK ... <state names>
 # and a row for each week
 # the value is the odds_ratio, arr, or whatever else we are exracting
+# basically one extracted statistic per dataframe created
+#
 # the key (sheet name) is the statistic being extracted
 # the result is put in the root[[ALL]] key
 # so there are two new keys added: odds_ratio, arr
 summarize_columns=function(){
   # extract week column to get weeks
-  # extract
+  # extract the columns to summarize to add keys to the ALL key in root
 
-  # save it in root under ALL
-  root[[ALL]][[summarize_columns_key]]=result_df
+  # extract the week column from the ALL week dataframe once
+  week_column = root[[ALL]][[week]][week]
+
+  # get list of all the "week" dataframes in root as a named list of
+  # dataframes in sorted order
+  dataframe_list=create_dataframe_list(root)
+
+  for (all_key in columns_to_summarize) {
+    # extract out the column of interest of this iteration
+    df=extract_and_bind_columns(dataframe_list, all_key)
+
+    # concatenate the two dataframes
+    result_df=cbind(week_column, df)
+
+    # save it in root under ALL
+    root[[ALL]][[all_key]]=result_df
+  }
 }
 
 # run
