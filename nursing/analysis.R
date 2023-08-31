@@ -1,7 +1,7 @@
 # analyze CMS Nursing Home data
 
-# test the new code with the lag
-# see what happens with LAG of 2
+# create ARR and OR summary keys in ALL key
+# when output excel, output all except name and records keys
 
 # todo: use the new summarize snippet to add summary to ALL of the OR values in Feb
 
@@ -85,7 +85,6 @@ library(rlang)
 library(r2r)  # hash tables
 
 
-
 mydir="nursing/data/"
 file_prefix=paste0(mydir,"faclevel_202")
 file_suffix=".csv"
@@ -123,8 +122,9 @@ columns_of_interest=c(week, provider_num, provider_state)
 # key names in root are the states of interest
 ALL = 'ALL'         # ALL states analysis; must do first since reuses this
 # Note that ALL must be listed first in each list
-all_states <- c(ALL, 'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY')
-top5_states <- c(ALL, 'CA', 'TX', 'FL', 'NY','PA') # top 5
+state_list <- c('AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY')
+all_states <- c(ALL, state_list)
+top5_states <- c(ALL, 'CA', 'TX', 'FL', 'NY','PA') # top 5 largest states
 
 states_of_interest=top5_states
 
@@ -146,8 +146,10 @@ main <- function(){
     dict[[name]]=s
     process_state(dict)
   }
-  OR_analysis()     # look at geo mean of OR in Feb 2021
-  # write out all the statesand ALL when done
+  print("Creating summary tab")
+  summarize_columns()
+
+  print("Saving to disk")
   save_to_disk()
 }
 
@@ -155,8 +157,10 @@ main <- function(){
 process_state <- function(dict){
   if (DEBUG) print(paste("processing",dict[[name]]))
   if (dict[[name]]==ALL){
+    print("Reading in the data files...")
     df=read_in_CMS_files()
     dict[[records]]=df
+    print("Analyzing records...")
     dict %>% analyze_records() # dict now has all the keys added to it (like IFR, odds, ncacm, ...)
     # everyone will start at root[[ALL]][[records]] dict with the 3 tables in it.
   }
@@ -371,6 +375,7 @@ calc_stats <- function (df, key_row_df){
   ifr_ref = key_row_df$ifr
   odds_ref = key_row_df$odds
 
+  # static key names of odds_ratio, arr
   df %>% mutate(ncacm = acm-deaths) %>%
      mutate(ifr = deaths/lag(cases,CASE_LAG)) %>%
      mutate(odds = deaths/(lag(cases, CASE_LAG)-deaths)) %>%
@@ -398,41 +403,23 @@ plot_results <- function(dict){
 }
 
 
-# http://www.sthda.com/english/wiki/writing-data-from-r-to-excel-files-xls-xlsx
-old_save_to_disk <- function (){
-  if (DEBUG) print("entering save to disk")
-
-  # this will write out the root dicts to excel file for each key
-  # in the root hashtable
-
-  # will give error if sheet name already exists
-  for (state in states_of_interest){
-    filename=paste0(output_filename_prefix,state,".xlsx")
-
-    # append is FALSE for the first sheet name, true for the rest
-    # so will create new file
-    for (sheet_name in columns_of_interest){
-            write.xlsx(dict[[sheet_name]], output_file, sheetName = sheet_name,
-        col.names = TRUE, row.names = FALSE, append =(sheet_name!=columns_of_interest[[1]]))
-    }
-  }
-}
 
 # https://cran.r-project.org/web/packages/openxlsx2/openxlsx2.pdf
+DO_NOT_OUTPUT=c(records, name)
 save_to_disk = function(){
   if (!SAVE_TO_DISK) return()
   for (state in states_of_interest){
     filename=paste0(output_filename_prefix,state,".xlsx")
     dict=root[[state]]
 
-    # append is FALSE for the first sheet name, true for the rest
-    # so will create new file
+    # output all keys in the dict except those in DO_NOT_OUTPUT
+    # note that ALL state has more keys so will have more tabs
+    # this is why we compute this on each iteration
+    columns=keys(dict)
+    columns=columns[!columns %in% DO_NOT_OUTPUT]
 
     wb <- wb_workbook()
-    columns=columns_of_interest
-    # the ALL spreadsheet has an additional key
-    if (state==ALL)
-      columns=c(columns, OR_analysis_key)
+
     for (sheet_name in columns){
       wb$add_worksheet(sheet_name)
       # now add the dataframe to that sheet
@@ -442,74 +429,36 @@ save_to_disk = function(){
   }
 }
 
-extract_numeric_values <- function(input_list) {
-  numeric_values <- input_list[is.numeric(input_list) &
-                                 is.finite(input_list) &
-                                 input_list >= -10 &
-                                 input_list <= 10]
-  return(numeric_values)
+
+summarize_columns_key="summary"   # hashmap key name for summary analysis stored in ALL
+# the names of the columns to summarize. use !!sym(name) in the functions
+
+# this function extracts odds_ratio and arr columns from all states
+# including ALL.
+#
+
+# helper function for summarize columns
+extract_and_bind_columns <- function(dataframe_list, column_name) {
+  extracted_columns <- lapply(dataframe_list, function(df) df[[column_name]])
+  result_dataframe <- do.call(cbind, extracted_columns)
+  colnames(result_dataframe) <- names(dataframe_list)
+  return(result_dataframe)
 }
 
-# use this for the average of the OR values
-# this takes a list of values and returns a SINGLE value
-geometric_mean <- function(v) {
-  print(sprintf("before extract numeric are %g", v))
-  v=extract_numeric_values(v)
-  print(sprintf("after extract numeric are %g", v))
-  if (is.null(v))
-      return(1)
-  print(sprintf("arg to mean(log(v)) are %g", v))
-  exp(mean(log(v)))
-}
-
-OR_analysis_key="or_analysis"   # hashmap key name for summary analysis stored in ALL
-
-OR_analysis=function(){
-  # replace with new fcn
-  # make a dataframe of the state and the log of the OR value averaged over Feb (rows ) (geometric mean) for each state
-  # Empty vectors to store results
-  state_names <- character()
-  odds_ref_values <- numeric()
-  odds_values <- numeric()
-  OR_values <- numeric()
-
-  # Iterate over state hashmaps
-  for (key in keys(root)) { # iterate over the states
-    state=root[[key]]   # get the hashmap for the state
-    state_name <- state[[name]]
-    week_df <- state[[week]]
-
-    cases = sum(week_df$cases[38:40])    # take infections from earlier
-    deaths = sum(week_df$deaths[39:41])  # months of feb
-
-    ref_cases =sum(week_df$cases[27:29])
-    ref_deaths = sum(week_df$deaths[28:30])
-
-    odds=deaths/(cases-deaths)
-    odds_reference = ref_deaths/(ref_cases-ref_deaths)
-    odds_ratio=odds/odds_reference
-
-    state_names <- append(state_names, state_name)
-    odds_values <- append(odds_values, odds)
-    odds_ref_values <- append(odds_ref_values, odds_reference)
-    OR_values <- append(OR_values, odds_ratio)
-  }
-
-  print(state_names)
-  print(odds_values)
-  print(odds_ref_values)
-  print(OR_values)
-
-  # Create a new dataframe
-  result_df <- data.frame(
-    State = state_names,
-    odds = odds_values,
-    odds_ref = odds_ref_values,
-    odds_ratio = OR_values
-  )
+columns_to_summarize=c("odds_ratio", "arr")
+# summarize_columns is called by main()
+# it creates a dataframe with columns: week ALL <state names>
+# and a row for each week
+# the value is the odds_ratio, arr, or whatever else we are exracting
+# the key (sheet name) is the statistic being extracted
+# the result is put in the root[[ALL]] key
+# so there are two new keys added: odds_ratio, arr
+summarize_columns=function(){
+  # extract week column to get weeks
+  # extract
 
   # save it in root under ALL
-  root[[ALL]][[OR_analysis_key]]=result_df
+  root[[ALL]][[summarize_columns_key]]=result_df
 }
 
 # run

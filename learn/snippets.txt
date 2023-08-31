@@ -663,3 +663,92 @@ OR_analysis=function(){
   # save it in root under ALL
   root[[ALL]][[OR_analysis_key]]=result_df
 }
+
+
+extract_numeric_values <- function(input_list) {
+  numeric_values <- input_list[is.numeric(input_list) &
+                                 is.finite(input_list) &
+                                 input_list >= -10 &
+                                 input_list <= 10]
+  return(numeric_values)
+}
+
+# use this for the average of the OR values
+# this takes a list of values and returns a SINGLE value
+geometric_mean <- function(v) {
+  print(sprintf("before extract numeric are %g", v))
+  v=extract_numeric_values(v)
+  print(sprintf("after extract numeric are %g", v))
+  if (is.null(v))
+      return(1)
+  print(sprintf("arg to mean(log(v)) are %g", v))
+  exp(mean(log(v)))
+}
+# http://www.sthda.com/english/wiki/writing-data-from-r-to-excel-files-xls-xlsx
+old_save_to_disk <- function (){
+  if (DEBUG) print("entering save to disk")
+
+  # this will write out the root dicts to excel file for each key
+  # in the root hashtable
+
+  # will give error if sheet name already exists
+  for (state in states_of_interest){
+    filename=paste0(output_filename_prefix,state,".xlsx")
+
+    # append is FALSE for the first sheet name, true for the rest
+    # so will create new file
+    for (sheet_name in columns_of_interest){
+            write.xlsx(dict[[sheet_name]], output_file, sheetName = sheet_name,
+        col.names = TRUE, row.names = FALSE, append =(sheet_name!=columns_of_interest[[1]]))
+    }
+  }
+}
+
+
+summarize_columns=function(){
+  # replace with new fcn
+  # make a dataframe of the state and the log of the OR value averaged over Feb (rows ) (geometric mean) for each state
+  # Empty vectors to store results
+  state_names <- character()
+  odds_ref_values <- numeric()
+  odds_values <- numeric()
+  OR_values <- numeric()
+
+  # Iterate over state hashmaps
+  for (key in keys(root)) { # iterate over the states
+    state=root[[key]]   # get the hashmap for the state
+    state_name <- state[[name]]
+    week_df <- state[[week]]
+
+    cases = sum(week_df$cases[38:40])    # take infections from earlier
+    deaths = sum(week_df$deaths[39:41])  # months of feb
+
+    ref_cases =sum(week_df$cases[27:29])
+    ref_deaths = sum(week_df$deaths[28:30])
+
+    odds=deaths/(cases-deaths)
+    odds_reference = ref_deaths/(ref_cases-ref_deaths)
+    odds_ratio=odds/odds_reference
+
+    state_names <- append(state_names, state_name)
+    odds_values <- append(odds_values, odds)
+    odds_ref_values <- append(odds_ref_values, odds_reference)
+    OR_values <- append(OR_values, odds_ratio)
+  }
+
+  print(state_names)
+  print(odds_values)
+  print(odds_ref_values)
+  print(OR_values)
+
+  # Create a new dataframe
+  result_df <- data.frame(
+    State = state_names,
+    odds = odds_values,
+    odds_ref = odds_ref_values,
+    odds_ratio = OR_values
+  )
+
+  # save it in root under ALL
+  root[[ALL]][[summarize_columns_key]]=result_df
+}
