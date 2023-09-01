@@ -31,21 +31,18 @@ arr="arr"
 # CONFIGURATION PARAMETERS
 DEBUG=FALSE
 SAVE_TO_DISK=TRUE
-ALL_STATES=TRUE
-CASE_LAG=1    # set number of weeks to lag cases when doing calculations with deaths & cases
-# for all analysis, we extract out the 4 OR values for February from each state
-# ALL_ANALYSIS_ROWS=seq(38,41)  # 38-41 will extract OR values from Feb 2021
+ALL_STATES=FALSE
+
 ALL_ANALYSIS_COLUMNS=c(provider_state) # all the other columns are already summarized
 
 # weights of cases starting with the current case
 # leave off the final value; it is computed so will sum to 1
 # this is optimized from the global data full set
-# it gives a cross correlation value of 0.995580541 which is as good as it gets
-# without overfitting
 
 # cases are basically shifted 1 week later with an equal tail before and after.
-case_weights=c(.22, .37) # fills in the last one (.1) automatically
-# this was derived from apple valley village response curve and returns 9964 and ,958
+case_weights=c(.22, .37, .36) # fills in the last one automatically so dies over 4 weeks
+# after a case is discovered.
+# this was derived from apple valley village response curve and returns .99743 and .973
 # for the global curve which is excelent.
 
 
