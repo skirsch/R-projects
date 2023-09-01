@@ -35,3 +35,15 @@ There are some data quality issues I have to look into, but the signal is super 
 Also, you can find states where the vaccine "works" but that's finding data that agrees with your beliefs, not explaining the data that doesn't.
 
 If you'd like to challenge my analysis, please see the Contact me instructions on my pinned tweet on twitter.
+
+I'll talk about all the attack vectors in my next substack. 
+
+In the meantime, people are going to avoid showing how the CMS data proves the vaccines are a success.
+
+This is record level data in the US nursing homes. IT DOESN'T get any better than this. 
+
+The IFR should have dropped like a rock post-vaccine rollout and it went up for 2.5 months after the shots. 
+
+The slope went up. You can pick ANY REFERENCE POINT YOU WANT. The slope of the OR line goes the wrong way... it got worse.
+
+Will anyone show their code or analysis showing this data proves the vaccines worked? No credible person would. You can't fight this. They've lost. The data shows they lied about the vaccine. 
