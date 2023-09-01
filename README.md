@@ -47,3 +47,5 @@ The IFR should have dropped like a rock post-vaccine rollout and it went up for 
 The slope went up. You can pick ANY REFERENCE POINT YOU WANT. The slope of the OR line goes the wrong way... it got worse.
 
 Will anyone show their code or analysis showing this data proves the vaccines worked? No credible person would. You can't fight this. They've lost. The data shows they lied about the vaccine. 
+
+Also, NEVER NEVER accept any handwaving argument without evidentiary support. The pro-vaccine people are good at deflecting ("look at Sweden") and giving bogus arguments that are not backed up by data.
