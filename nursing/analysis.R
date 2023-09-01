@@ -34,8 +34,20 @@ SAVE_TO_DISK=TRUE
 ALL_STATES=TRUE
 CASE_LAG=1    # set number of weeks to lag cases when doing calculations with deaths & cases
 # for all analysis, we extract out the 4 OR values for February from each state
-ALL_ANALYSIS_ROWS=seq(38,41)  # 38-41 will extract OR values from Feb 2021
+# ALL_ANALYSIS_ROWS=seq(38,41)  # 38-41 will extract OR values from Feb 2021
 ALL_ANALYSIS_COLUMNS=c(provider_state) # all the other columns are already summarized
+
+# weights of cases starting with the current case
+# leave off the final value; it is computed so will sum to 1
+# this is optimized from the global data full set
+# it gives a cross correlation value of 0.995580541 which is as good as it gets
+# without overfitting
+
+# cases are basically shifted 1 week later with an equal tail before and after.
+case_weights=c(.22, .37) # fills in the last one (.1) automatically
+# this was derived from apple valley village response curve and returns 9964 and ,958
+# for the global curve which is excelent.
+
 
 # to do...
 # add lag(cases, CASE_LAG) to computations
@@ -376,13 +388,18 @@ combine_by <- function (df, col_name=week) {
 # key_row_df has the elements we need to compute the stats and is passed in
 # be sure to order these so if newest columns need older columns, they are there
 
-case_weights=c(0.249023942, 0.197854088, 0.405863759, 0.147258211)
 
-cases_shifted <- function(cases){
+if (sum(case_weights)!=1)
+  case_weights=c(case_weights, 1-sum(case_weights))  # add final value which could be negative!
+
+mylag <- function(cases){
   cases_out=0
-  for (i in seq(1,4))
-    cases_out=cases_out+case_weights*lag(cases, i-1)
-  }
+  for (i in seq(1,length(case_weights)))
+    cases_out=cases_out+case_weights[i]*lag(cases, i-1)
+  return(cases_out)
+}
+
+# mutate refers to column name
 
 calc_stats <- function (df, key_row_df){
 
@@ -391,8 +408,8 @@ calc_stats <- function (df, key_row_df){
 
   # static key names of odds_ratio, arr
   df %>% mutate(ncacm = acm-deaths) %>%
-     mutate(ifr = deaths/lag(cases,CASE_LAG)) %>%
-     mutate(odds = deaths/(lag(cases, CASE_LAG)-deaths)) %>%
+     mutate(ifr = deaths/mylag(cases)) %>%
+     mutate(odds = deaths/(mylag(cases)-deaths)) %>%
      mutate(odds_ratio=odds/odds_ref) %>% # OR
      mutate(rr =   ifr/ifr_ref) %>% # RR
      mutate(arr = ifr_ref-ifr) # ARR... note the reference is first

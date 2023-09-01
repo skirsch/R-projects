@@ -752,3 +752,5 @@ summarize_columns=function(){
   # save it in root under ALL
   root[[ALL]][[summarize_columns_key]]=result_df
 }
+
+case_weights=c(0.249023942, 0.197854088, 0.405863759) #test
