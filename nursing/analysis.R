@@ -376,6 +376,14 @@ combine_by <- function (df, col_name=week) {
 # key_row_df has the elements we need to compute the stats and is passed in
 # be sure to order these so if newest columns need older columns, they are there
 
+case_weights=c(0.249023942, 0.197854088, 0.405863759, 0.147258211)
+
+cases_shifted <- function(cases){
+  cases_out=0
+  for (i in seq(1,4))
+    cases_out=cases_out+case_weights*lag(cases, i-1)
+  }
+
 calc_stats <- function (df, key_row_df){
 
   ifr_ref = key_row_df$ifr
