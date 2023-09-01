@@ -33,3 +33,5 @@ The week, odds ratio, and arr tabs in the spreadsheets are all valid.
 There are some data quality issues I have to look into, but the signal is super strong here and it's important to let people know this asap which is why I made this public.
 
 Also, you can find states where the vaccine "works" but that's finding data that agrees with your beliefs, not explaining the data that doesn't.
+
+If you'd like to challenge my analysis, please see the Contact me instructions on my pinned tweet on twitter.
