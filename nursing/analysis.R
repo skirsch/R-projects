@@ -1,9 +1,13 @@
 # analyze CMS Nursing Home data
 
-# create ARR and OR summary keys in ALL key
-# when output excel, output all except name and records keys
+# to do
+# Now have do QA on the tabs because
+# when we did the lag(case,1) it means that can only compute extra stats
+# on the week table, not on provider or state tables which we are clearly doing!
+# so need to caculate those without a lag. Check that OR on those tabs is
+# correctly computed from the reference OR!
 
-# todo: use the new summarize snippet to add summary to ALL of the OR values in Feb
+# 8/31/23 everything works.
 
 # 8/30/23: revised analysis with time lag worked perfectly.
 # vaccine made things worse.
