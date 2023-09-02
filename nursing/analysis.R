@@ -32,12 +32,20 @@ arr="arr"
 DEBUG=FALSE
 SAVE_TO_DISK=TRUE
 ALL_STATES=FALSE
+ALL_ONLY=TRUE   # set to TRUE to limit analysis to just ALL, no states
 
-ALL_ANALYSIS_COLUMNS=c(provider_state) # all the other columns are already summarized
+# specify which column will by used for the "all analysis" function
+# One column per state makes the most sense
+# this will generate OR and ARR tables; each table is week x state
+# this allows a scatterplot so you can see how the states are individually
+# moving each week
+ALL_ANALYSIS_COLUMNS=c(provider_state)
 
 # weights of cases starting with the current case
 # leave off the final value; it is computed so will sum to 1
 # this is optimized from the global data full set
+
+# change so can rerun
 
 # cases are basically shifted 1 week later with an equal tail before and after.
 case_weights=c(.22, .37, .36) # fills in the last one automatically so dies over 4 weeks
@@ -141,10 +149,13 @@ state_list <- c('AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI'
 all_states <- c(ALL, state_list)
 top5_states <- c(ALL, 'CA', 'TX', 'FL', 'NY','PA') # top 5 largest states
 
-states_of_interest=top5_states
+states_of_interest=top5_states  # default analysis is on top 5 states
 
 if (ALL_STATES)
   states_of_interest=all_states
+
+if (ALL_ONLY)
+  states_of_interest=ALL
 
 
 # settable parameters
@@ -155,9 +166,18 @@ endyear=3    # 2023 is last file read in
 # this has the container for everything
 root=hashmap()
 
+reset <- function(){
+  # this will totally reset everything so main will work with an empty state
+  # in most cases, just call main each time and it will only do the work
+  # it needs to do
+  rm(root)
+}
+
 main <- function(){
   for (s in states_of_interest){
-    dict=root[[s]]=hashmap()
+    dict=root[[s]]
+    if (is.null(dict))    # only create if not already there; otherwise re-use
+        dict=root[[s]]=hashmap()
     dict[[name]]=s
     process_state(dict)
   }
@@ -173,8 +193,8 @@ process_state <- function(dict){
   if (DEBUG) print(paste("processing",dict[[name]]))
   if (dict[[name]]==ALL){
     print("Reading in the data files...")
-    df=read_in_CMS_files()
-    dict[[records]]=df
+    if (is.null(dict[[records]]))
+      dict[[records]]=read_in_CMS_files()
     print("Analyzing records...")
     dict %>% analyze_records() # dict now has all the keys added to it (like IFR, odds, ncacm, ...)
     # everyone will start at root[[ALL]][[records]] dict with the 3 tables in it.
