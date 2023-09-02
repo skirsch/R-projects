@@ -31,8 +31,8 @@ arr="arr"
 # CONFIGURATION PARAMETERS
 DEBUG=FALSE
 SAVE_TO_DISK=TRUE
-ALL_STATES=FALSE
-ALL_ONLY=TRUE   # set to TRUE to limit analysis to just ALL, no states
+ALL_STATES=FALSE  # default is 5 largest states only
+ALL_ONLY=FALSE    # set to TRUE to limit analysis to just ALL, no states
 
 # specify which column will by used for the "all analysis" function
 # One column per state makes the most sense
