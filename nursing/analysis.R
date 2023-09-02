@@ -572,5 +572,7 @@ clean_up_dataframe <- function(df, limits_list, ignore_column=week){
 }
 
 # run
+# call this each time to run. Call reset() to really start from scratch
+# after the first run (only needed for development).
 main()
 
