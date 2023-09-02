@@ -47,12 +47,8 @@ ALL_ANALYSIS_COLUMNS=c(provider_state)
 
 # change so can rerun
 
-# cases are basically shifted 1 week later with an equal tail before and after.
-case_weights=c(.22, .37, .36) # fills in the last one automatically so dies over 4 weeks
-# after a case is discovered.
-# this was derived from apple valley village response curve and returns .99743 and .973
-# for the global curve which is excelent.
-
+# cases are basically shifted 1 week so use closest Poisson coefficients
+case_weights=c(.37, .37, .18, .06) # fills in the last one automatically
 
 # to do...
 # add lag(cases, CASE_LAG) to computations
