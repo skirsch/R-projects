@@ -754,3 +754,33 @@ summarize_columns=function(){
 }
 
 case_weights=c(0.249023942, 0.197854088, 0.405863759) #test
+
+
+
+# to compute all rows, we first need to compute the odds of the reference row
+# so do that here and return the whole row for everyone to use.
+# so basically, we do a special computation to compute just the reference
+# row first, and we squirrel it away (we do not append it) here for
+# others to reference
+# get the comparison row from the df and return it. Others will need it
+# so if everything worked right, the main analysis will compute an OR of 1
+# for the reference row, an an ARR of 0, etc.
+get_key_row <- function(df){
+  # grab the key row and the row above it so we can grab the cases from
+  # there. Use CASE_LAG for where to grab cases from
+  dfk_cases=mylag(df[,cases])[key_row_num,]# get the right number of cases
+  dfk_deaths=df[key_row_num,]    # without the comma, returns col 1. Get a dataframe of 1 row
+  # now add computed columns IFR and Odds which makes other code easier
+  # dfk is a dataframe of ONE row
+  cases_ref=dfk_cases$cases  # grab cases column
+  deaths_ref=dfk_deaths$deaths # grab deaths column
+
+  # the LAG IS NOW ALREADY IN THE VALUES!
+  # no need to lag when using them
+  # add the two computed columns to our one special row
+  # (use the deaths row) since the cases row is lagged
+  dfk_deaths %>% cbind(ifr=deaths_ref/cases_ref) %>%
+  cbind(odds=deaths_ref/(cases_ref-deaths_ref))
+  # now we have this special 1 row new dataframe that everyone can reference
+  # when computing any of the derived columns
+}

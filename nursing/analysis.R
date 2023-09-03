@@ -1,6 +1,17 @@
 # analyze CMS Nursing Home data
 
 # to do
+# pre-compute the IFR_ref and Odds_ref... that's all we need; save as variable
+# see how it does with the MIN_DEATHS=1
+#
+# compute first without reference ... just compute it the first time and then compute
+# again so double compute
+# replace poisson coefficients with gamma distribution
+# state graphs need to use the state computed OR reference, not global ref.
+#
+# implement min_deaths
+# calculate the OR reference using the new method
+
 # Now have do QA on the tabs because
 # when we did the lag(case,1) it means that can only compute extra stats
 # on the week table, not on provider or state tables which we are clearly doing!
@@ -33,6 +44,8 @@ DEBUG=FALSE
 SAVE_TO_DISK=TRUE
 ALL_STATES=FALSE  # default is 5 largest states only
 ALL_ONLY=FALSE    # set to TRUE to limit analysis to just ALL, no states
+MIN_DEATHS=1      # a facility must report at least 1 death to be included
+MAX_DEATHS=150
 
 # specify which column will by used for the "all analysis" function
 # One column per state makes the most sense
@@ -47,11 +60,12 @@ ALL_ANALYSIS_COLUMNS=c(provider_state)
 
 # change so can rerun
 
-# cases are basically shifted 1 week so use closest Poisson coefficients
-case_weights=c(.37, .37, .18, .06) # fills in the last one automatically
+# cases are basically shifted 1 week
+# specify just two values. third is filled in automatically
+# correlation is .996 with .2, .6, .2
+case_weights=c(.2, .6)
 
 # to do...
-# add lag(cases, CASE_LAG) to computations
 # add new global_summary() function like I asked chatgpt that extracts
 # the "target row" of state db, plus some interesting columns as well, e.g., 4 weeks OR
 
@@ -162,12 +176,7 @@ endyear=3    # 2023 is last file read in
 # this has the container for everything
 root=hashmap()
 
-reset <- function(){
-  # this will totally reset everything so main will work with an empty state
-  # in most cases, just call main each time and it will only do the work
-  # it needs to do
-  rm(root)
-}
+
 
 main <- function(){
   for (s in states_of_interest){
@@ -206,33 +215,6 @@ process_state <- function(dict){
 
 }
 
-# to compute all rows, we first need to compute the odds of the reference row
-# so do that here and return the whole row for everyone to use.
-# so basically, we do a special computation to compute just the reference
-# row first, and we squirrel it away (we do not append it) here for
-# others to reference
-# get the comparison row from the df and return it. Others will need it
-# so if everything worked right, the main analysis will compute an OR of 1
-# for the reference row, an an ARR of 0, etc.
-get_key_row <- function(df){
-  # grab the key row and the row above it so we can grab the cases from
-  # there. Use CASE_LAG for where to grab cases from
-  dfk_cases=df[key_row_num-CASE_LAG,]# grab reference cases from row above
-  dfk_deaths=df[key_row_num,]    # without the comma, returns col 1. Get a dataframe of 1 row
-  # now add computed columns IFR and Odds which makes other code easier
-  # dfk is a dataframe of ONE row
-  cases_ref=dfk_cases$cases  # grab cases column
-  deaths_ref=dfk_deaths$deaths # grab deaths column
-
-  # the LAG IS NOW ALREADY IN THE VALUES!
-  # no need to lag when using them
-  # add the two computed columns to our one special row
-  # (use the deaths row) since the cases row is lagged
-  dfk_deaths %>% cbind(ifr=deaths_ref/cases_ref) %>%
-  cbind(odds=deaths_ref/(cases_ref-deaths_ref))
-  # now we have this special 1 row new dataframe that everyone can reference
-  # when computing all the derived columns
-}
 
 # use this to limit records we are processing
 # if dict[[name]]==ALL, we want to remove the BAD records
@@ -294,8 +276,8 @@ filter_criteria <- function(df, state_name) {
     # filter will return the records that match the criteria
     # then we will take these records (which are "bad") and remove them
     # based on their provider ID
-    df %>% filter(ifr > 1 | deaths > 150 | cases > 300 | cases ==0 |
-             (cases>100 & deaths==0) )
+    df %>% filter(ifr > 1 | deaths > MAX_DEATHS | cases > 300 | cases ==0 |
+             (cases>100 & deaths<MIN_DEATHS) )
   }
   else {
     # select the records which do NOT match the state name so they can be removed
@@ -320,14 +302,10 @@ analyze_records <- function(dict){
   key_row_df=NULL    # this will be set to values in the comparison row for OR calc
 
   for (col_name in columns_of_interest){
-    # do one df at a time
+    # do one df at a time: week, provider, state
     # always start with the original full dataframe when doing combine_by
-    df1 = df %>% combine_by(col_name)
-    if (is.null(key_row_df)){            # if first time, extract key row after the combine
-          key_row_df=get_key_row(df1)   # get the core fields needed and compute other columns
-    }
-    dict[[col_name]]=df1 %>% calc_stats(key_row_df)
-    # now add this result to our list of dataframes
+    dict[[col_name]]= df %>% combine_by(col_name) %>% calc_stats()
+    # add this result to our list of dataframes
   }
   return(dict)
 }
@@ -413,11 +391,15 @@ mylag <- function(cases){
 }
 
 # mutate refers to column name
+# calculate the new rows
+calc_stats <- function (df){
+  # precalc the IFR and odds of the reference row
+  ref_cases=mylag(df$cases)[key_row_num]
+  ref_deaths=df$deaths[key_row_num]
+  ifr_ref= ref_deaths/ref_cases
+  odds_ref =ref_deaths/(ref_cases-ref_deaths)
 
-calc_stats <- function (df, key_row_df){
-
-  ifr_ref = key_row_df$ifr
-  odds_ref = key_row_df$odds
+  # now we can use this for calculating AAR and odds_ratio
 
   # static key names of odds_ratio, arr
   df %>% mutate(ncacm = acm-deaths) %>%
@@ -568,7 +550,8 @@ clean_up_dataframe <- function(df, limits_list, ignore_column=week){
 }
 
 # run
-# call this each time to run. Call reset() to really start from scratch
-# after the first run (only needed for development).
+# call this each time to run. type rm(root) to clear everything to force
+# everything to run from scratch
+
 main()
 
