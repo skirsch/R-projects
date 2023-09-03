@@ -27,6 +27,18 @@
 # We have 1. neutralized that with the time lag and 2. the peak happened when
 # case rates had stabilized and 3. The OR stayed above 1 until 4/4/21!!!
 
+### CODE STRUCTURE
+# main
+#  process_state for states of interest starting with ALL
+#    read in original data files (or reload from saved cache)
+#    extract_records (ALL=remove bad providers; per state=remove providers in other states)
+#	       filter_criteria
+#    analyze_records
+#     	combine_by (collapse into single record a week)
+#	      calc_stats (add new computed columns)
+#  summarize columns (create summaries in ALL over all states for odds_ratio and ARR
+#  save to disk
+
 # field names inside the df tables
 cases="cases"
 deaths="deaths"
@@ -39,13 +51,21 @@ odds_ratio="odds_ratio"
 arr="arr"
 
 
+##########
 # CONFIGURATION PARAMETERS
+#
 DEBUG=FALSE
 SAVE_TO_DISK=TRUE
 ALL_STATES=FALSE  # default is 5 largest states only
 ALL_ONLY=FALSE    # set to TRUE to limit analysis to just ALL, no states
-MIN_DEATHS=1      # a facility must report at least 1 death to be included
-MAX_DEATHS=150
+
+# Config which facilities will be included in the calculations
+MIN_DEATHS=0      # a facility must report at least 1 death to be included
+MAX_DEATHS=200
+MAX_CASES=300 # filter out over this value; too many cases
+MIN_CASES=0   # filter out below this value. Set to 0 for no filtering.
+MAX_IFR=1     # don't allow a provider whose IFR >1
+
 
 # specify which column will by used for the "all analysis" function
 # One column per state makes the most sense
@@ -133,9 +153,10 @@ week1="Week.Ending"
 beds1="Number.of.All.Beds"
 key_row_num = 29   # vax rollout is Dec 11 so this is week before that (12/6/2020) = row 29 for our reference
 
-# define the key names used in each state dict
+# define the key names used in each state (and ALL) dict
 # each of these 4 keys will hold a dataframe
 records='records'   # holds the master df with all the records. this is usually initialzed from root[[ALL]][[records]]
+original_records='original_records'  # this has exactly what was read in from CMS
 # week is key holding the df with the week records
 # provider_num ...
 # provider_state key containing the df for by state
@@ -198,8 +219,7 @@ process_state <- function(dict){
   if (DEBUG) print(paste("processing",dict[[name]]))
   if (dict[[name]]==ALL){
     print("Reading in the data files...")
-    if (is.null(dict[[records]]))
-      dict[[records]]=read_in_CMS_files()
+    dict[[records]]=read_in_CMS_files()  # get original records from file or cache
     print("Analyzing records...")
     dict %>% analyze_records() # dict now has all the keys added to it (like IFR, odds, ncacm, ...)
     # everyone will start at root[[ALL]][[records]] dict with the 3 tables in it.
@@ -216,9 +236,9 @@ process_state <- function(dict){
 }
 
 
-# use this to limit records we are processing
-# if dict[[name]]==ALL, we want to remove the BAD records
-# else we will filter out all other states and make sure dict[[records]] is set to the result
+# use this to limit records we are processing on this run
+# if dict[[name]]==ALL, we want to remove the BAD records provider records
+# otherwise we will filter out all other states and make sure dict[[records]] is set to the result
 #
 # Purpose: replace the records dict with the extracted records dict (either just this state or cleaned original records if ALL)
 extract_records <- function(dict){
@@ -234,11 +254,15 @@ extract_records <- function(dict){
   # cases =0 or > 300
   # deaths range >150
 
+  # the filter_criteria function is where the filterin magic happens
+  # different for ALL vs other states! So check there
+
   if (DEBUG) print("Entering extract_records")
   table1=dict[[provider_num]] # the provider table so we do analysis on the providers to determine which ones to remove
   table2=dict[[records]]  # all the records
 
-  state_name=dict[[name]]
+  state_name=dict[[name]]  # the name of the state (or "ALL")
+
   # Apply the filtering criteria to the provider table to get the provider IDs to remove
   # from the database
   # state_name will be a specific state name or ALL and the function will do the right thing
@@ -271,13 +295,15 @@ extract_records <- function(dict){
 # records already tossed. So if you try to run the removal criteria again, you'll get 0 records
 # for the second criteria. So solution is to use the initial criteria if state isn't specified,
 # and use the other criteria when it is
+
+
 filter_criteria <- function(df, state_name) {
   if (state_name == ALL){
     # filter will return the records that match the criteria
     # then we will take these records (which are "bad") and remove them
     # based on their provider ID
-    df %>% filter(ifr > 1 | deaths > MAX_DEATHS | cases > 300 | cases ==0 |
-             (cases>100 & deaths<MIN_DEATHS) )
+    df %>% filter(ifr > MAX_IFR | deaths > MAX_DEATHS | cases > MAX_CASES | cases <MIN_CASES)
+          # more complex conditions can be added like:   (cases>100 & deaths<MIN_DEATHS)
   }
   else {
     # select the records which do NOT match the state name so they can be removed
@@ -299,7 +325,6 @@ analyze_records <- function(dict){
 
   # this creates the key_row_df which is then no longer available outside this function
   df=dict[[records]]  # get the df containing the FULL database
-  key_row_df=NULL    # this will be set to values in the comparison row for OR calc
 
   for (col_name in columns_of_interest){
     # do one df at a time: week, provider, state
@@ -311,18 +336,24 @@ analyze_records <- function(dict){
 }
 
 read_in_CMS_files <- function(){
-  tbl=data.frame()   # create empty container
+  df=dict[[ALL]][[original_records]]   #
+  if (!is.null(df))
+    # no need to read in if already there
+    return(df)
+  df=data.frame()   # create empty container
   for (i in seq(startyear,endyear,1)) {
     tbl1 <- read.csv(paste0(file_prefix, i, file_suffix))
-    # just interested in key columns in the original .csv file
+    # just interested in the key columns in the original .csv file
     tbl1 = tbl1[, columns_to_extract]
     # sort everything by date in column 1 which makes debugging a little easier
     # tbl1=tbl1[ order(tbl1[,1]),]
-    tbl=rbind(tbl,tbl1) #  append the new table entries to the bottom
+    df=rbind(df,tbl1) #  append the new table entries to the bottom
   }
   # set new column names for use in summarize inside of combine_weeks
-  colnames(tbl)=c(week, provider_num, provider_state, cases, deaths, acm, beds)
-  tbl %>% mutate_at(vars(week), mdy)  # set date type for the date
+  colnames(df)=c(week, provider_num, provider_state, cases, deaths, acm, beds)
+  # save away the table permanently as "original records" so no need to re-read
+  # if run with different param
+  dict[[ALL]][[original_records]]= df %>% mutate_at(vars(week), mdy)  # set date type for the date
 }
 
 # called by analyze_records
