@@ -56,7 +56,7 @@ arr="arr"
 #
 DEBUG=FALSE
 SAVE_TO_DISK=TRUE
-ALL_STATES=FALSE  # default is 5 largest states only
+ALL_STATES=TRUE  # default is 5 largest states only
 ALL_ONLY=FALSE    # set to TRUE to limit analysis to just ALL, no states
 
 # Config which facilities will be included in the calculations
@@ -65,6 +65,16 @@ MAX_DEATHS=200
 MAX_CASES=300 # filter out over this value; too many cases
 MIN_CASES=0   # filter out below this value. Set to 0 for no filtering.
 MAX_IFR=1     # don't allow a provider whose IFR >1
+
+columns_to_summarize=c("odds_ratio", "arr")
+
+# min max values to apply to the summarized data
+columns_to_summarize_limits=list(
+  # excel does a horrible job with y-axis labels on
+  # scatter plots so this limits to 4
+  odds_ratio=list(0,4),
+  arr=list(-1,1))
+
 
 
 # specify which column will by used for the "all analysis" function
@@ -530,14 +540,6 @@ to_named_list <- function(hashmap) {
 }
 
 
-columns_to_summarize=c("odds_ratio", "arr")
-
-# min max values to apply to the summarized data
-columns_to_summarize_limits=list(
-  # excel does a horrible job with y-axis labels on
-  # scatter plots so this limits to 4
-  odds_ratio=list(0,4),
-  arr=list(-1,1))
 
 # summarize_columns is called by main()
 # it creates a dataframe with columns: week ALL AL AK ... <state names>
@@ -581,7 +583,7 @@ clean_up_dataframe <- function(df, limits_list, ignore_column=week){
 }
 
 # run
-# call this each time to run. type rm(root) to clear everything to force
+# call this each time to run. type root=hashmap() to clear everything to force
 # everything to run from scratch
 
 main()
