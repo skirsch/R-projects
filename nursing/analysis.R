@@ -1,8 +1,7 @@
 # analyze CMS Nursing Home data
 
 # to do
-# pre-compute the IFR_ref and Odds_ref... that's all we need; save as variable
-# see how it does with the MIN_DEATHS=1
+# update provider and state calc stats to do the MINIMUM calcs (no ref calculation)
 #
 # compute first without reference ... just compute it the first time and then compute
 # again so double compute
@@ -33,10 +32,10 @@
 #    read in original data files (or reload from saved cache)
 #    extract_records (ALL=remove bad providers; per state=remove providers in other states)
 #	       filter_criteria
-#    analyze_records
-#     	combine_by (collapse into single record a week)
+#    analyze_records (week, provider, state): Loops through type to call these functions
+#     	combine_by (collapse into single record a week, per provider, or for the state)
 #	      calc_stats (add new computed columns)
-#  summarize columns (create summaries in ALL over all states for odds_ratio and ARR
+#  summarize columns (create summaries in ALL over all states for just odds_ratio and ARR for scatter plot
 #  save to disk
 
 # field names inside the df tables
@@ -129,13 +128,6 @@ case_weights=c(.2, .6)
 # most functions will pipe the state hash table between the function calls, not the df
 # that way there is no arguments ever needed between the functions
 
-####
-# PROCESS sequence
-#  analyze >> extract >>analyze -->  create initial db of records
-#  initial db of records  >>extract >> analyze for states
-#  the "analyze" routine will call combine_by to create the new df tables week, provider, state
-#  the extract will call filter...
-####
 
 
 library(openxlsx2)   # write out xlsx; doesn't need java
@@ -333,13 +325,12 @@ analyze_records <- function(dict){
 
   if (DEBUG) print("start of analyze records")
 
-  # this creates the key_row_df which is then no longer available outside this function
   df=dict[[records]]  # get the df containing the FULL database
 
   for (col_name in columns_of_interest){
     # do one df at a time: week, provider, state
     # always start with the original full dataframe when doing combine_by
-    dict[[col_name]]= df %>% combine_by(col_name) %>% calc_stats()
+    dict[[col_name]]= df %>% combine_by(col_name) %>% calc_stats(col_name)
     # add this result to our list of dataframes
   }
   return(dict)
@@ -433,8 +424,8 @@ mylag <- function(cases){
 
 # mutate refers to column name
 # calculate the new rows
-calc_stats <- function (df){
-  # precalc the IFR and odds of the reference row
+calc_stats <- function (df, col_name){
+  # precalc the IFR and odds of the reference row for the week
   ref_cases=mylag(df$cases)[key_row_num]
   ref_deaths=df$deaths[key_row_num]
   ifr_ref= ref_deaths/ref_cases
@@ -442,13 +433,18 @@ calc_stats <- function (df){
 
   # now we can use this for calculating AAR and odds_ratio
 
-  # static key names of odds_ratio, arr
-  df %>% mutate(ncacm = acm-deaths) %>%
+  if (col_name==week) {
+    df %>% mutate(ncacm = acm-deaths) %>%
      mutate(ifr = deaths/mylag(cases)) %>%
      mutate(odds = deaths/(mylag(cases)-deaths)) %>%
      mutate(odds_ratio=odds/odds_ref) %>% # OR
      mutate(rr =   ifr/ifr_ref) %>% # RR
      mutate(arr = ifr_ref-ifr) # ARR... note the reference is first
+  } else {  # lag no longer makes sense, nor does OR or ARR if not week analysis
+    df %>% mutate(ncacm = acm-deaths) %>%
+     mutate(ifr = deaths/cases) %>%
+     mutate(odds = deaths/(cases-deaths))
+  }
 }
 
 
