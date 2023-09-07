@@ -1,7 +1,9 @@
 # analyze CMS Nursing Home data
 
 # to do
-# don't limit the ORR to 4, etc
+# compute for each provider the IFR for an 8 week window
+# prior to the reference week vs. 8 weeks after the reference week
+# to see if can find a provider where the IFR dropped by 3X or more
 #
 # compute first without reference ... just compute it the first time and then compute
 # again so double compute
@@ -78,11 +80,13 @@ endyear=3    # 2023 is last file read in
 # min max values to apply to the summarized data
 columns_to_summarize_limits=list(
   # excel does a horrible job with y-axis labels on
-  # scatter plots so this limits to 4
-  odds_ratio=list(0,4),
-  arr=list(-1,1))
+  # scatter plots so this limits to 4 if you need it
+  odds_ratio=list(.05,20),  # limit by 20X in each direction
+  arr=list(-1,1))  # arr should always be between these limits
 
-
+# For each provider, we'll calculate the IFR for the set number of weeks prior to the
+# reference week and after the reference week
+IFR_CALC_WINDOW=12
 
 # specify which column will by used for the "all analysis" function
 # One column per state makes the most sense
@@ -161,7 +165,9 @@ acm1="Residents.Weekly.All.Deaths"
 provider_num1="Federal.Provider.Number"
 week1="Week.Ending"
 beds1="Number.of.All.Beds"
-key_row_num = 29   # vax rollout is Dec 11 so this is week before that (12/6/2020) = row 29 for our reference
+
+# Reference week number
+reference_row_num = 29   # vax rollout is Dec 11 so this is week before that (12/6/2020) = row 29 for our reference
 
 # define the key names used in each state (and ALL) dict
 # each of these 4 keys will hold a dataframe
@@ -431,8 +437,8 @@ mylag <- function(cases){
 # calculate the new rows
 calc_stats <- function (df, col_name){
   # precalc the IFR and odds of the reference row for the week
-  ref_cases=mylag(df$cases)[key_row_num]
-  ref_deaths=df$deaths[key_row_num]
+  ref_cases=mylag(df$cases)[reference_row_num]
+  ref_deaths=df$deaths[reference_row_num]
   ifr_ref= ref_deaths/ref_cases
   odds_ref =ref_deaths/(ref_cases-ref_deaths)
 
@@ -445,7 +451,8 @@ calc_stats <- function (df, col_name){
      mutate(odds_ratio=odds/odds_ref) %>% # OR
      mutate(rr =   ifr/ifr_ref) %>% # RR
      mutate(arr = ifr_ref-ifr) # ARR... note the reference is first
-  } else {  # lag no longer makes sense, nor does OR or ARR if not week analysis
+     # now add IFR calc around window both before and after reference
+  } else {  # since rows not weeks, lag no longer makes sense, nor does OR or ARR if not week analysis
     df %>% mutate(ncacm = acm-deaths) %>%
      mutate(ifr = deaths/cases) %>%
      mutate(odds = deaths/(cases-deaths))
