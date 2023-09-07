@@ -1,7 +1,7 @@
 # analyze CMS Nursing Home data
 
 # to do
-# update provider and state calc stats to do the MINIMUM calcs (no ref calculation)
+# don't limit the ORR to 4, etc
 #
 # compute first without reference ... just compute it the first time and then compute
 # again so double compute
@@ -65,7 +65,15 @@ MAX_CASES=300 # filter out over this value; too many cases
 MIN_CASES=0   # filter out below this value. Set to 0 for no filtering.
 MAX_IFR=1     # don't allow a provider whose IFR >1
 
+# columns to summarize for each week for each state analyzed
+# we can run stats on the arr since it should have mean of 0
+# to see how the states compared with their reference
 columns_to_summarize=c("odds_ratio", "arr")
+
+
+# For limiting data read in
+startyear=0   # 2020
+endyear=3    # 2023 is last file read in
 
 # min max values to apply to the summarized data
 columns_to_summarize_limits=list(
@@ -191,9 +199,6 @@ if (ALL_ONLY)
   states_of_interest=ALL
 
 
-# settable parameters
-startyear=0   # 2020
-endyear=3    # 2023 is last file read in
 
 
 # this has the container for everything
