@@ -463,8 +463,8 @@ calc_stats <- function (df, col_name){
       # do two combine_by calls, one for the weeks before, the other for the weeks after
       # so what we did before, except limit the range of cells
       # use IFR_CALC_WINDOW
-      # first cheat and get the original record dataframe (ordf)
-      ordf=root[[ALL]][[original_records]]
+      # first cheat and get the record dataframe (not the original) (ordf)
+      ordf=root[[ALL]][[records]]
       start_row=reference_row_num-IFR_CALC_WINDOW
       end_row=reference_row_num-1
       start2_row = reference_row_num+1
