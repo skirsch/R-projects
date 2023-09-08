@@ -55,10 +55,10 @@ arr="arr"
 ##########
 # CONFIGURATION PARAMETERS
 #
-DEBUG=FALSE
+DEBUG=TRUE
 SAVE_TO_DISK=TRUE
-ALL_STATES=TRUE  # default is 5 largest states only
-ALL_ONLY=FALSE    # set to TRUE to limit analysis to just ALL, no states
+ALL_STATES=FALSE  # FALSE will do 5 largest states only
+ALL_ONLY=TRUE    # set to TRUE to limit analysis to just ALL, no states
 
 # Config which facilities will be included in the calculations
 MIN_DEATHS=0      # a facility must report at least 1 death to be included
@@ -248,6 +248,26 @@ process_state <- function(dict){
 
 }
 
+read_in_CMS_files <- function(){
+  df=root[[ALL]][[original_records]]   #
+  if (!is.null(df))
+    # no need to read in if already there
+    return(df)
+  df=data.frame()   # create empty container
+  for (i in seq(startyear,endyear,1)) {
+    tbl1 <- read.csv(paste0(file_prefix, i, file_suffix))
+    # just interested in the key columns in the original .csv file
+    tbl1 = tbl1[, columns_to_extract]
+    # sort everything by date in column 1 which makes debugging a little easier
+    # tbl1=tbl1[ order(tbl1[,1]),]
+    df=rbind(df,tbl1) #  append the new table entries to the bottom
+  }
+  # set new column names for use in summarize inside of combine_weeks
+  colnames(df)=c(week, provider_num, provider_state, cases, deaths, acm, beds)
+  # save away the table permanently as "original records" so no need to re-read
+  # if run with different param
+  root[[ALL]][[original_records]]= df %>% mutate_at(vars(week), mdy)  # set date type for the date
+}
 
 # use this to limit records we are processing on this run
 # if dict[[name]]==ALL, we want to remove the BAD records provider records
@@ -326,47 +346,24 @@ filter_criteria <- function(df, state_name) {
   }
 }
 
+# analyze_records takes the original dataframe and creates 3 output summary dataframes
+# specified in columns_of_interest: state, provider_num, week
+# want to analyze by state, provider_num, week
 analyze_records <- function(dict){
-  # takes the original dataframe and creates 3 output summary dataframes
-  # specified in columns_of_interest: state, provider_num, week
-  # want to analyze by state, provider_num, week
-  # dict=list(master=df)    # initialize the list df is the "master" df with all values
-  # make sure to do the get key row call after doing combine by week call and BEFORE calc stats
-  # so make it a multi-line loop so can do this properly
 
   if (DEBUG) print("start of analyze records")
 
   df=dict[[records]]  # get the df containing the FULL database
 
   for (col_name in columns_of_interest){
-    # do one df at a time: week, provider, state
-    # always start with the original full dataframe when doing combine_by
+    # create one new df at a time with names: "week", "provider", "state"
+    # always started with the original_records full dataframe when doing combine_by
     dict[[col_name]]= df %>% combine_by(col_name) %>% calc_stats(col_name)
     # add this result to our list of dataframes
   }
   return(dict)
 }
 
-read_in_CMS_files <- function(){
-  df=dict[[ALL]][[original_records]]   #
-  if (!is.null(df))
-    # no need to read in if already there
-    return(df)
-  df=data.frame()   # create empty container
-  for (i in seq(startyear,endyear,1)) {
-    tbl1 <- read.csv(paste0(file_prefix, i, file_suffix))
-    # just interested in the key columns in the original .csv file
-    tbl1 = tbl1[, columns_to_extract]
-    # sort everything by date in column 1 which makes debugging a little easier
-    # tbl1=tbl1[ order(tbl1[,1]),]
-    df=rbind(df,tbl1) #  append the new table entries to the bottom
-  }
-  # set new column names for use in summarize inside of combine_weeks
-  colnames(df)=c(week, provider_num, provider_state, cases, deaths, acm, beds)
-  # save away the table permanently as "original records" so no need to re-read
-  # if run with different param
-  dict[[ALL]][[original_records]]= df %>% mutate_at(vars(week), mdy)  # set date type for the date
-}
 
 # called by analyze_records
 # combine cases and deaths with the same week into one row for each week
@@ -397,30 +394,23 @@ combine_by <- function (df, col_name=week) {
   # any modification to the data itself. So you have to use
   # reframe to see the results.
 
-  if (col_name == provider_num )
+  # generate the 3 columns added to every df type
+  df1=df %>% group_by(!!field_symbol) %>%
+       reframe(cases = sum(cases,na.rm=TRUE),
+            deaths = sum(deaths, na.rm=TRUE),
+            acm = sum(acm, na.rm=TRUE))
+  if (col_name == provider_num ){
     # for generating the provider tab, include the state of the provider as well as beds
-    df=df %>% group_by(!!field_symbol) %>%
-       reframe(cases = sum(cases,na.rm=TRUE),
-            deaths = sum(deaths, na.rm=TRUE),
-            acm = sum(acm, na.rm=TRUE),
-            state=head(state,1),  # we can take any item since they are the same so take the first
-            beds=head(beds,1)    # ditto
-            )
-    else
-    df=df %>% group_by(!!field_symbol) %>%
-       reframe(cases = sum(cases,na.rm=TRUE),
-            deaths = sum(deaths, na.rm=TRUE),
-            acm = sum(acm, na.rm=TRUE)
-            )
-  dict[[col_name]]=df        # save it away in the dict for that state
-  return(df)   # return the derived sheet (either weeks, provider, state)
+    # Need to start with df (the full source), not df1 that we just created
+    df2=df %>% group_by(!!field_symbol) %>%
+       reframe(state=head(state,1),  # we can take any item since they are the same so take the first
+            beds=head(beds,1))    # ditto
+    df1= cbind(df1, df2)
+  }
+  # next line not needed; analyze records will do this at the end
+  # dict[[col_name]]=df        # save it away in the dict for that state
+  return(df1)   # return the derived sheet (either weeks, provider, state)
 }
-
-# add new computed columns (so long as computed from values in same row it's easy)
-# input has week, cases, deaths columns (columns of interest)
-# add 4 new computed columns: ncacm, ifr, odds, OR, RR, and ARR
-# key_row_df has the elements we need to compute the stats and is passed in
-# be sure to order these so if newest columns need older columns, they are there
 
 
 if (sum(case_weights)!=1)
@@ -433,8 +423,16 @@ mylag <- function(cases){
   return(cases_out)
 }
 
-# mutate refers to column name
-# calculate the new rows
+# calc_stats will calculate the columns to append to the current df and append them
+# This is called by analyze_records after we've combined the records and created the aggregated outputs
+
+# add new computed columns (so long as computed from values in same row it's easy)
+# input has week, cases, deaths columns (columns of interest)
+# add 4 new computed columns: ncacm, ifr, odds, OR, RR, and ARR
+# key_row_df has the elements we need to compute the stats and is passed in
+# be sure to order these so if newest columns need older columns, they are there
+
+
 calc_stats <- function (df, col_name){
   # precalc the IFR and odds of the reference row for the week
   ref_cases=mylag(df$cases)[reference_row_num]
@@ -451,12 +449,21 @@ calc_stats <- function (df, col_name){
      mutate(odds_ratio=odds/odds_ref) %>% # OR
      mutate(rr =   ifr/ifr_ref) %>% # RR
      mutate(arr = ifr_ref-ifr) # ARR... note the reference is first
-     # now add IFR calc around window both before and after reference
   } else {  # since rows not weeks, lag no longer makes sense, nor does OR or ARR if not week analysis
-    df %>% mutate(ncacm = acm-deaths) %>%
-     mutate(ifr = deaths/cases) %>%
-     mutate(odds = deaths/(cases-deaths))
+    df=df %>% mutate(ncacm = acm-deaths) %>%
+      mutate(ifr = deaths/cases) %>%
+      mutate(odds = deaths/(cases-deaths))
+    # If col_name is provider, add IFR calc around window both before and after reference
+    if (col_name==provider_num) {
+      # do two combine_by calls, one for the weeks before, the other for the weeks after
+      # so what we did before, except limit the range of cells
+
+      # next add them to the provider table as two new columns
+      df %>% mutate(ifr_before = cases ) %>%
+             mutate(ifr_after = cases)
+    }
   }
+  # returns the df we created
 }
 
 
