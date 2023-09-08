@@ -84,8 +84,12 @@ columns_to_summarize_limits=list(
   odds_ratio=list(.05,20),  # limit by 20X in each direction
   arr=list(-1,1))  # arr should always be between these limits
 
+# Reference week number
+reference_row_num = 29   # vax rollout is Dec 11 so this is week before that (12/6/2020) = row 29 for our reference
+
 # For each provider, we'll calculate the IFR for the set number of weeks prior to the
-# reference week and after the reference week
+# reference week and after the reference week and put that in the provider table
+# so we can easily see if any providers reduced their IFRs post vaccine
 IFR_CALC_WINDOW=12
 
 # specify which column will by used for the "all analysis" function
@@ -166,8 +170,6 @@ provider_num1="Federal.Provider.Number"
 week1="Week.Ending"
 beds1="Number.of.All.Beds"
 
-# Reference week number
-reference_row_num = 29   # vax rollout is Dec 11 so this is week before that (12/6/2020) = row 29 for our reference
 
 # define the key names used in each state (and ALL) dict
 # each of these 4 keys will hold a dataframe
@@ -460,13 +462,26 @@ calc_stats <- function (df, col_name){
     if (col_name==provider_num) {
       # do two combine_by calls, one for the weeks before, the other for the weeks after
       # so what we did before, except limit the range of cells
+      # use IFR_CALC_WINDOW
+      # first cheat and get the original record dataframe (ordf)
+      ordf=root[[ALL]][[original_records]]
+      start_row=reference_row_num-IFR_CALC_WINDOW
+      end_row=reference_row_num-1
+      start2_row = reference_row_num+1
+      end2_row=reference_row_num+IFR_CALC_WINDOW
+      df_new=ordf %>% group_by(provider) %>%
+       reframe(cases_before = sum(cases[start_row:end_row],na.rm=TRUE),
+               deaths_before =  sum(deaths[start_row:end_row],na.rm=TRUE),
+               cases_after = sum(cases[start2_row:end2_row],na.rm=TRUE),
+               deaths_after =  sum(deaths[start2_row:end2_row],na.rm=TRUE))
 
-      # next add them to the provider table as two new columns
-      df %>% mutate(ifr_before = cases ) %>%
-             mutate(ifr_after = cases)
+      # next remove the first column (provider ID) so we are left with 4 columns
+      df_new=df_new[,-1]
+      df=cbind(df, df_new)
     }
   }
   # returns the df we created
+  return(df)
 }
 
 
@@ -490,7 +505,7 @@ plot_results <- function(dict){
 
 
 # https://cran.r-project.org/web/packages/openxlsx2/openxlsx2.pdf
-DO_NOT_OUTPUT=c(records, name)
+DO_NOT_OUTPUT=c(original_records, records, name)
 save_to_disk = function(){
   if (!SAVE_TO_DISK) return()
   for (state in states_of_interest){
@@ -508,6 +523,10 @@ save_to_disk = function(){
     for (sheet_name in columns){
       wb$add_worksheet(sheet_name)
       # now add the dataframe to that sheet
+      # avoid bug in openxlsx2
+      if (is.null(dict[[sheet_name]]))
+        next
+      if (DEBUG) print(c("about to output", sheet_name))
       wb$add_data(x=dict[[sheet_name]])
     }
     wb$save(filename)
