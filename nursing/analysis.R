@@ -55,7 +55,7 @@ arr="arr"
 ##########
 # CONFIGURATION PARAMETERS
 #
-DEBUG=TRUE
+DEBUG=FALSE
 SAVE_TO_DISK=TRUE
 ALL_STATES=FALSE  # FALSE will do 5 largest states only
 ALL_ONLY=TRUE    # set to TRUE to limit analysis to just ALL, no states
@@ -448,7 +448,7 @@ calc_stats <- function (df, col_name){
   # now we can use this for calculating AAR and odds_ratio
 
   if (col_name==week) {
-    df %>% mutate(ncacm = acm-deaths) %>%
+    df=df %>% mutate(ncacm = acm-deaths) %>%
      mutate(ifr = deaths/mylag(cases)) %>%
      mutate(odds = deaths/(mylag(cases)-deaths)) %>%
      mutate(odds_ratio=odds/odds_ref) %>% # OR
@@ -601,15 +601,15 @@ summarize_columns=function(){
   # we summarize the  odds_ratio and arr for all states
   # with a column for each state
   # rows are weeks, columns are states. there is one df for odds_ratio, another for ARR
-  for (all_key in columns_to_summarize) {
+  for (col_to_summarize in columns_to_summarize) {
     # extract out the column of interest of this iteration
-    df=extract_and_bind_columns(dataframe_list, all_key)
+    df=extract_and_bind_columns(dataframe_list, col_to_summarize)
 
     # concatenate the two dataframes, and then apply any limits
-    result_df=cbind(week_column, df) %>% clean_up_dataframe(columns_to_summarize_limits[[all_key]])
+    result_df=cbind(week_column, df) %>% clean_up_dataframe(columns_to_summarize_limits[[col_to_summarize]])
 
     # save it in root under ALL
-    root[[ALL]][[all_key]]=result_df
+    root[[ALL]][[col_to_summarize]]=result_df
   }
 }
 # given a dataframe, limit the values to a range but don't apply to

@@ -785,6 +785,8 @@ get_key_row <- function(df){
   # when computing any of the derived columns
 }
 
+      df_new=df_new[, (ncol(df_new) - 3):ncol(df_new)]
+
 
 # my attempt to clean up code gave error
 
