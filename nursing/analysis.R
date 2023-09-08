@@ -186,7 +186,7 @@ name='name'
 columns_to_extract=c(week1,provider_num1, provider_state1, cases1, deaths1, acm1, beds1)
 
 # columns to summarize on to create 3 summary sheets
-# these are the sheet names to create at the end
+# these are the sheet names to create at the end which appear as "week" "provider" "state"
 columns_of_interest=c(week, provider_num, provider_state)
 
 # key names in root are the states of interest
@@ -395,21 +395,24 @@ combine_by <- function (df, col_name=week) {
   # reframe to see the results.
 
   # generate the 3 columns added to every df type
-  df1=df %>% group_by(!!field_symbol) %>%
+  if (col_name == provider_num )
+    # for generating the provider tab, include the state of the provider as well as beds
+    df=df %>% group_by(!!field_symbol) %>%
        reframe(cases = sum(cases,na.rm=TRUE),
             deaths = sum(deaths, na.rm=TRUE),
-            acm = sum(acm, na.rm=TRUE))
-  if (col_name == provider_num ){
-    # for generating the provider tab, include the state of the provider as well as beds
-    # Need to start with df (the full source), not df1 that we just created
-    df2=df %>% group_by(!!field_symbol) %>%
-       reframe(state=head(state,1),  # we can take any item since they are the same so take the first
-            beds=head(beds,1))    # ditto
-    df1= cbind(df1, df2)
-  }
+            acm = sum(acm, na.rm=TRUE),
+            state=head(state,1),  # we can take any item since they are the same so take the first
+            beds=head(beds,1)    # ditto
+            )
+    else
+    df=df %>% group_by(!!field_symbol) %>%
+       reframe(cases = sum(cases,na.rm=TRUE),
+            deaths = sum(deaths, na.rm=TRUE),
+            acm = sum(acm, na.rm=TRUE)
+            )
   # next line not needed; analyze records will do this at the end
   # dict[[col_name]]=df        # save it away in the dict for that state
-  return(df1)   # return the derived sheet (either weeks, provider, state)
+  return(df)   # return the derived sheet (either weeks, provider, state)
 }
 
 

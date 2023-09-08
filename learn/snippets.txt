@@ -784,3 +784,22 @@ get_key_row <- function(df){
   # now we have this special 1 row new dataframe that everyone can reference
   # when computing any of the derived columns
 }
+
+
+# my attempt to clean up code gave error
+
+ df1=df %>% group_by(!!field_symbol) %>%
+       reframe(cases = sum(cases,na.rm=TRUE),
+            deaths = sum(deaths, na.rm=TRUE),
+            acm = sum(acm, na.rm=TRUE))
+  if (col_name == provider_num ){
+    if (DEBUG) print(c("entering the reframe with state and beds for column", col_name))
+
+    # if we are doing the "provider tab" additional work!
+    # for generating the provider tab, include the state of the provider as well as beds
+    # Need to start with df (the full source), not df1 that we just created
+    df2=df %>% group_by(!!field_symbol) %>%
+       reframe(state=head(state,1),  # we can take any item since they are the same so take the first
+            beds=head(beds,1))    # ditto
+    df1= cbind(df1, df2)
+  }
