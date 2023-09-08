@@ -587,6 +587,7 @@ to_named_list <- function(hashmap) {
 # the key (sheet name) is the statistic being extracted
 # the result is put in the root[[ALL]] key
 # so there are two new keys added: odds_ratio, arr
+# this allows scatterplot of states by date showing what is going on
 summarize_columns=function(){
   # extract week column to get weeks
   # extract the columns to summarize to add keys to the ALL key in root
@@ -597,7 +598,9 @@ summarize_columns=function(){
   # get list of all the "week" dataframes in root as a named list of
   # dataframes in sorted order
   dataframe_list=create_dataframe_list(root)
-
+  # we summarize the  odds_ratio and arr for all states
+  # with a column for each state
+  # rows are weeks, columns are states. there is one df for odds_ratio, another for ARR
   for (all_key in columns_to_summarize) {
     # extract out the column of interest of this iteration
     df=extract_and_bind_columns(dataframe_list, all_key)
