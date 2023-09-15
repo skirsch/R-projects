@@ -85,11 +85,15 @@ columns_to_summarize_limits=list(
   odds_ratio=list(.05,20),  # limit by 20X in each direction
   arr=list(-1,1))  # arr should always be between these limits
 
-# Reference week number
+# Reference week number (week before the vaccine rolled out)
+# vaccines were first rolled out on Dec 18, 2020 to a small number of homes, more on Monday
+# so the week ending 12/20/20 is the last week of virtually no vaccine
+# 31 = 12/20/20 reference date
 # 29 = 12/6/20 which is week ending before when vax first available for anyone (12/11/20)
 # 32 = 12/27/20 which is right before a lot of nursing homes got the shots
 
-reference_row_num = 32
+
+reference_row_num = 31
 
 # For each provider, we'll calculate the IFR for the set number of weeks prior to the
 # reference week and after the reference week and put that in the provider table
