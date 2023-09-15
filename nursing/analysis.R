@@ -61,11 +61,12 @@ ALL_STATES=FALSE  # FALSE will do 5 largest states only
 ALL_ONLY=TRUE    # set to TRUE to limit analysis to just ALL, no states
 
 # Config which facilities will be included in the calculations
-MIN_DEATHS=0      # a facility must report at least 1 death to be included
-MAX_DEATHS=200
-MAX_CASES=300 # filter out over this value; too many cases
-MIN_CASES=0   # filter out below this value. Set to 0 for no filtering.
-MAX_IFR=1     # don't allow a provider whose IFR >1
+# this is based on stats over the ENTIRE period
+MIN_DEATHS=0      # a facility with less than this number of deaths will be ignored
+MAX_DEATHS=200  # a facility with more than this number of deaths will be ignored
+MAX_CASES=300 # filter out facilities with more than MAX_cases
+MIN_CASES=0   # filter out facilitie with fewer than this num of cases. Set to 0 for no filtering.
+MAX_IFR=1     # don't allow a provider whose IFR >1 for the entire period
 
 # columns to summarize for each week for each state analyzed
 # we can run stats on the arr since it should have mean of 0
@@ -85,7 +86,10 @@ columns_to_summarize_limits=list(
   arr=list(-1,1))  # arr should always be between these limits
 
 # Reference week number
-reference_row_num = 29   # vax rollout is Dec 11 so this is week before that (12/6/2020) = row 29 for our reference
+# 29 = 12/6/20 which is week ending before when vax first available for anyone (12/11/20)
+# 32 = 12/27/20 which is right before a lot of nursing homes got the shots
+
+reference_row_num = 32
 
 # For each provider, we'll calculate the IFR for the set number of weeks prior to the
 # reference week and after the reference week and put that in the provider table
@@ -337,7 +341,9 @@ filter_criteria <- function(df, state_name) {
     # filter will return the records that match the criteria
     # then we will take these records (which are "bad") and remove them
     # based on their provider ID
-    df %>% filter(ifr > MAX_IFR | deaths > MAX_DEATHS | cases > MAX_CASES | cases <MIN_CASES)
+    df %>% filter(ifr > MAX_IFR | deaths > MAX_DEATHS | cases > MAX_CASES | cases <MIN_CASES |
+                    deaths < MIN_DEATHS
+                  )
           # more complex conditions can be added like:   (cases>100 & deaths<MIN_DEATHS)
   }
   else {
