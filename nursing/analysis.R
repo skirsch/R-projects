@@ -88,12 +88,11 @@ columns_to_summarize_limits=list(
 # Reference week number (week before the vaccine rolled out)
 # vaccines were first rolled out on Dec 18, 2020 to a small number of homes, more on Monday
 # so the week ending 12/20/20 is the last week of virtually no vaccine
-# 31 = 12/20/20 reference date
 # 29 = 12/6/20 which is week ending before when vax first available for anyone (12/11/20)
-# 32 = 12/27/20 which is right before a lot of nursing homes got the shots
+# 32 = 12/27/20 which is right before the big push in US nursing homes
+# 88 = 1/23/22 which is another peak point to prove it isn't rising cases
 
-
-reference_row_num = 31
+reference_row_num = 88
 
 # For each provider, we'll calculate the IFR for the set number of weeks prior to the
 # reference week and after the reference week and put that in the provider table
