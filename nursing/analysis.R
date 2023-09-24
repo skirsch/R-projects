@@ -92,11 +92,12 @@ columns_to_summarize_limits=list(
 # 32 = 12/27/20 which is right before the big push in US nursing homes
 # 88 = 1/23/22 which is another peak point to prove it isn't rising cases
 
-reference_row_num = 88
+reference_row_num = 32
 
 # For each provider, we'll calculate the IFR for the set number of weeks prior to the
 # reference week and after the reference week and put that in the provider table
 # so we can easily see if any providers reduced their IFRs post vaccine
+# the before and after does NOT include the reference row.
 IFR_CALC_WINDOW=12
 
 # specify which column will by used for the "all analysis" function
