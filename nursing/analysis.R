@@ -65,7 +65,7 @@ ALL_ONLY=TRUE    # set to TRUE to limit analysis to just ALL, no states
 MIN_DEATHS=0      # a facility with less than this number of deaths will be ignored
 MAX_DEATHS=200  # a facility with more than this number of deaths will be ignored
 MAX_CASES=300 # filter out facilities with more than MAX_cases
-MIN_CASES=0   # filter out facilitie with fewer than this num of cases. Set to 0 for no filtering.
+MIN_CASES=0   # filter out facilities with fewer than this num of cases. Set to 0 for no filtering.
 MAX_IFR=1     # don't allow a provider whose IFR >1 for the entire period
 
 # columns to summarize for each week for each state analyzed
