@@ -61,12 +61,16 @@ ALL_STATES=FALSE  # FALSE will do 5 largest states only
 ALL_ONLY=TRUE    # set to TRUE to limit analysis to just ALL, no states
 
 # Config which facilities will be included in the calculations
-# this is based on stats over the ENTIRE period
+# this is based on stats over the ENTIRE period. The idea is that not all facilities accurately report
+# so this should remove most, if not all, the facilities reporting suspect data
 MIN_DEATHS=0      # a facility with less than this number of deaths will be ignored
-MAX_DEATHS=200  # a facility with more than this number of deaths will be ignored
-MAX_CASES=300 # filter out facilities with more than MAX_cases
+MAX_DEATHS=50  # a facility with more than this number of deaths will be ignored
+MAX_CASES=400 # filter out facilities with more than MAX_cases
 MIN_CASES=0   # filter out facilities with fewer than this num of cases. Set to 0 for no filtering.
-MAX_IFR=1     # don't allow a provider whose IFR >1 for the entire period
+MAX_IFR=.5     # don't allow a provider whose IFR >.5 for the entire period
+MIN_NCACM=0   # Non-COVID ACM shouldn't be negative for a site
+MAX_NCACM=260 # prevent single large sites from skewing the data (could be data error if more than this)
+MAX_ACM=300   # Max reasonable ACM for a facility; virtually none are higher than this
 
 # columns to summarize for each week for each state analyzed
 # we can run stats on the arr since it should have mean of 0
@@ -345,13 +349,15 @@ filter_criteria <- function(df, state_name) {
     # filter will return the records that match the criteria
     # then we will take these records (which are "bad") and remove them
     # based on their provider ID
+    # so we remove providers who supply nonsensical data by looking at the provider tab of ALL
     df %>% filter(ifr > MAX_IFR | deaths > MAX_DEATHS | cases > MAX_CASES | cases <MIN_CASES |
-                    deaths < MIN_DEATHS
+                    deaths < MIN_DEATHS | ncacm< MIN_NCACM | ncacm > MAX_NCACM | acm > MAX_ACM
                   )
           # more complex conditions can be added like:   (cases>100 & deaths<MIN_DEATHS)
   }
   else {
-    # select the records which do NOT match the state name so they can be removed
+    # We are analyzing by an individual state.
+    # So select the records which do NOT match the state name so they can be removed
     # so this will be a big list of all states we don't want, e.g., everything but CA for the CA pass
     # note that state will be interpreted as a literal field name to match the column
     df %>% filter(state != state_name)
