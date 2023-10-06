@@ -16,7 +16,7 @@
 # Now have do QA on the tabs because
 # when we did the lag(case,1) it means that can only compute extra stats
 # on the week table, not on provider or state tables which we are clearly doing!
-# so need to caculate those without a lag. Check that OR on those tabs is
+# so need to calculate those without a lag. Check that OR on those tabs is
 # correctly computed from the reference OR!
 
 # 8/31/23 everything works.
@@ -159,7 +159,7 @@ case_weights=c(.2, .6)
 
 
 library(openxlsx2)   # write out xlsx; doesn't need java
-library(xlsx)  # this one works without stoi exception
+# library(xlsx)  # requires Java and openxlsx2 works great.
 library(dplyr) # need for pipe operation to work
 require(stats)
 library(lubridate)
@@ -635,12 +635,12 @@ clean_up_dataframe <- function(df, limits_list, ignore_column=week){
   max_value=limits_list[[2]]
   df %>%
     mutate(across(-all_of(ignore_column), ~ pmin(pmax(.x, min_value), max_value)))
-
 }
 
 # run
-# call this each time to run. type root=hashmap() to clear everything to force
-# everything to run from scratch
+# call main() each time to run.
+# type root=hashmap() to clear everything to force
+# everything to run from scratch (if you change the QA criteria for providers)
 
 main()
 
