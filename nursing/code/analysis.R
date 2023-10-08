@@ -67,7 +67,8 @@ MIN_DEATHS=0      # a facility with less than this number of deaths will be igno
 MAX_DEATHS=50  # a facility with more than this number of deaths will be ignored
 MAX_CASES=400 # filter out facilities with more than MAX_cases
 MIN_CASES=0   # filter out facilities with fewer than this num of cases. Set to 0 for no filtering.
-MAX_IFR=.5     # don't allow a provider whose IFR >.5 for the entire period
+MAX_IFR=.5     # don't allow a provider whose IFR >.5 for the entire period. This is liberal to allow for few hundred more homes
+              # but a more sane limit would be .25 or less. It doesn't change the outcome
 MIN_NCACM=0   # Non-COVID ACM shouldn't be negative for a site
 MAX_NCACM=260 # prevent single large sites from skewing the data (could be data error if more than this)
 MAX_ACM=300   # Max reasonable ACM for a facility; virtually none are higher than this
@@ -83,9 +84,12 @@ startyear=0   # 2020
 endyear=3    # 2023 is last file read in
 
 # min max values to apply to the summarized data
+# this ONLY applies to values in the "odds_ratio" and "arr" tabs of the spreadsheet
+# this was useful to apply these limits for excel graphing to save time
+# this is only useful if you are analyzing each state
 columns_to_summarize_limits=list(
   # excel does a horrible job with y-axis labels on
-  # scatter plots so this limits to 4 if you need it
+  # scatter plots so this limits to a factor of 4x if you need it
   odds_ratio=list(.05,20),  # limit by 20X in each direction
   arr=list(-1,1))  # arr should always be between these limits
 
@@ -120,7 +124,10 @@ ALL_ANALYSIS_COLUMNS=c(provider_state)
 # cases are basically shifted 1 week
 # specify just two values. third is filled in automatically
 # correlation is .996 with .2, .6, .2
-case_weights=c(.2, .6)
+# so when we compute things like odds and IFR for a given week, we are using the ACTUAL deaths on that week
+# and we are using weighted average of the number of case
+# so .2*current week cases, .6*# cases 1 week ago, and .2*# of cases 2 weeks ago = effective number of cases for the week
+case_weights=c(.2, .6)  # this is effectively a .2, .6, .2 weighting because it fills in the missing weight
 
 # to do...
 # add new global_summary() function like I asked chatgpt that extracts
