@@ -1,5 +1,5 @@
-## data obtained from 
-## https://mpidr.shinyapps.io/stmortality/ 
+## data obtained from
+## https://mpidr.shinyapps.io/stmortality/
 
 
 if(!require(pacman)) install.packages("pacman")
@@ -11,7 +11,7 @@ pacman::p_load(magrittr, tidyverse, rio, stringi, GGally,
                stringr, ggplot2, ggseas, forecast)
 
 ## load data
-df <- rio::import("./data/Mortality_NZ_2023.xlsx", sheet = "NZL_NP")
+df <- rio::import("./NewZealand/data/Mortality_NZ_2023.xlsx", sheet = "NZL_NP")
 
 # duplicate check----
 stopifnot(df[duplicated(df),] %>% nrow == 0)
