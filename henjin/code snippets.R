@@ -1,0 +1,9 @@
+library(data.table)
+buck=fread("http://sars2.net/f/czbucketsfirstdose.csv.gz")
+std=fread("http://sars2.net/f/czcensus2021pop.csv")[[2]]
+t=buck[type!="Unvaccinated",.(dead=sum(dead),alive=sum(alive)),.(vaxmonth,type,age)]
+t=rbind(t,t[,.(dead=sum(dead),alive=sum(alive),vaxmonth="Total"),.(type,age)])
+totage=t[,.(age="Total",alive=as.double(sum(alive)),asmr=sum(dead/alive*std[pmin(age,100)+1]/sum(std)*365e5)),.(vaxmonth,type)]
+t=t[,.(alive=sum(alive),asmr=sum(dead/alive*std[pmin(age,100)+1]/sum(std)*365e5)),.(vaxmonth,type,age=pmin(age%/%10*10,90))]
+t=rbind(t,totage)
+t[,.(ratio=asmr[type=="Moderna"]/asmr[type=="Pfizer"]),.(vaxmonth,age)]|>with(round(xtabs(ratio~vaxmonth+age),2))
