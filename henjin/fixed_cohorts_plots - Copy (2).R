@@ -55,45 +55,45 @@ p <- p[!is.na(x) & is.finite(y) & !is.na(facet) & !is.na(cum)]
 tab <- p[, .N, by = .(facet, cum)][N > 0]
 p <- merge(p, tab, by = c("facet", "cum"))
 
-# Only plot one panel at a time: e.g., CMR cumulative
-p <- p[facet == "CMR" & cum == "Cumulative"]
-
-# Extra safeguard: remove non-finite rows and compute valid y-range
-yrange <- range(p$y[is.finite(p$y)], na.rm = TRUE)
-p <- p[is.finite(y) & !is.na(y)]
-
 # Ensure date-related variables are Date type
 xstart <- as.Date("2021-01-01")
 xend <- as.Date("2025-01-01")
 xbreak <- seq(xstart + 182, xend, by = "year")
 xlab <- format(xbreak, "%Y")
 
-# Abort if data invalid
-if (nrow(p) == 0 || diff(yrange) == 0 || any(!is.finite(yrange))) {
-  stop("Filtered data is empty or y-range invalid — skipping plot.")
-}
-
-# Hardcoded y-axis for testing to avoid viewport bug
-ymin <- 0
-ymax <- max(p$y, na.rm = TRUE)
-ybreaks <- pretty(c(ymin, ymax), 4)
+# Additional debug info
+print("Facet-Cum Counts:"); print(p[, .N, by = .(facet, cum)])
+print("x summary:"); print(summary(p$x))
+print("y summary:"); print(summary(p$y))
+print("xstart:"); print(xstart)
+print("xend:"); print(xend)
+print("xbreak:"); print(xbreak)
+print("xlab:"); print(xlab)
+print("facet levels:"); print(unique(p$facet))
+print("cum levels:"); print(unique(p$cum))
+print("dose levels:"); print(unique(p$dose))
+print("type levels:"); print(unique(p$type))
+print("x range:"); print(range(p$x))
+print("y range:"); print(range(p$y))
+print("Panel-wise min/max x/y:")
+print(p[, .(xmin = min(x), xmax = max(x), ymin = min(y), ymax = max(y)), by = .(facet, cum)])
 
 # Generate the plot
 plot <- ggplot(p) +
-  facet_null() +
+  facet_grid(facet ~ cum, scales = "free") +
   geom_vline(xintercept = xbreak, color = "gray87", linewidth = 0.4, lineend = "square") +
   geom_vline(xintercept = iso["2021-24"] - 3.5, color = "gray87", linewidth = 0.4, linetype = "22") +
   geom_line(aes(x = x, y = y, color = dose, alpha = type), linewidth = 0.6) +
   labs(x = NULL, y = NULL, title = "Czech Republic, people born in 1940 or later") +
   scale_x_date(limits = c(xstart, xend), breaks = xbreak, labels = xlab) +
   scale_y_continuous(
-    limits = c(ymin, ymax),
-    breaks = ybreaks,
+    limits = function(x) range(pretty(c(0, x), 4), finite = TRUE),
+    breaks = function(x) pretty(c(0, x), 4),
     labels = function(x) ifelse(x == max(x), "", ifelse(x >= 1e3, paste0(x / 1e3, "k"), x))
   ) +
   scale_color_manual(values = c("black", "#6666ff", "#ff6666")) +
   scale_alpha_manual(values = c(1, 0.4)) +
-  coord_cartesian(clip = "off", expand = TRUE) +
+  coord_cartesian(clip = "off", expand = FALSE) +
   theme(
     axis.text = element_text(size = 11, color = "gray50", margin = margin(2, 2, 2, 2)),
     axis.ticks.length = unit(0, "pt"),
@@ -121,8 +121,4 @@ plot <- ggplot(p) +
     strip.text = element_text(size = 11, margin = margin(3, 3, 3, 3))
   )
 
-# Save to file (bypasses broken viewport in RStudio)
-#ggsave("cmr_cumulative_plot.png", plot, width = 9, height = 6, dpi = 300)
-png("cmr_cumulative_plot.png", width = 9, height = 6, units = "in", res = 300)
 print(plot)
-dev.off()
