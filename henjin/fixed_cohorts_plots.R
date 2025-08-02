@@ -56,7 +56,7 @@ tab <- p[, .N, by = .(facet, cum)][N > 0]
 p <- merge(p, tab, by = c("facet", "cum"))
 
 # Only plot one panel at a time: e.g., CMR cumulative
-p <- p[facet == "CMR" & cum == "Cumulative"]
+# p <- p[facet == "CMR" & cum == "Cumulative"]
 
 # Extra safeguard: remove non-finite rows and compute valid y-range
 yrange <- range(p$y[is.finite(p$y)], na.rm = TRUE)
@@ -77,6 +77,18 @@ if (nrow(p) == 0 || diff(yrange) == 0 || any(!is.finite(yrange))) {
 ymin <- 0
 ymax <- max(p$y, na.rm = TRUE)
 ybreaks <- pretty(c(ymin, ymax), 4)
+
+library(openxlsx)
+
+# Create a clean exportable table of week-level data
+export_data <- p[, .(week, date=as.character(x), dose=as.character(dose), type=as.character(type),
+                     facet=as.character(facet), cum=as.character(cum), value=y)]
+
+# Write to Excel
+write.xlsx(export_data, file = "henjin/ASMR_CMR_by_week.xlsx", asTable = TRUE)
+
+# exit now since plot won't work
+q()
 
 # Generate the plot
 plot <- ggplot(p) +
